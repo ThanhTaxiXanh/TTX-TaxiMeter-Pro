@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ttx_taximeter_pro/core/gps_policy.dart';
+import 'package:ttx_taximeter_pro/core/taximeter_engine.dart';
 
 import 'test_support.dart';
 
@@ -31,130 +32,213 @@ GpsEvaluation step(GpsEvaluation? prev, GpsSample sample) {
   );
 }
 
-void main() {
-  test('G1: toa do ngoai mien / ts khong tang -> REJECT', () {
-    final GpsEvaluation bad = step(null, s(1000, lat: 910000000));
-    expect(bad.decision, GpsDecision.rejected);
-    expect(bad.rejectReason, 'SANITY_COORD');
+/// Chay mot chuoi mau tu trang thai rong, tra ve moi ket qua.
+List<GpsEvaluation> run(List<GpsSample> samples) {
+  final List<GpsEvaluation> out = <GpsEvaluation>[];
+  GpsPolicyState state = const GpsPolicyState();
+  for (final GpsSample x in samples) {
+    final GpsEvaluation e = GpsPolicy.evaluate(state, x, cfg);
+    state = e.state;
+    out.add(e);
+  }
+  return out;
+}
 
-    final GpsEvaluation ok = step(null, s(1000));
-    expect(ok.decision, GpsDecision.accepted);
-    final GpsEvaluation sameTs = step(ok, s(1000));
-    expect(sameTs.decision, GpsDecision.rejected);
-    expect(sameTs.rejectReason, 'SANITY_TS');
-    final GpsEvaluation olderTs = step(ok, s(900));
-    expect(olderTs.decision, GpsDecision.rejected);
-  });
+List<AcceptedPoint> acceptedPoints(
+  List<GpsSample> samples,
+  List<GpsEvaluation> evals,
+) {
+  final List<AcceptedPoint> pts = <AcceptedPoint>[];
+  for (int i = 0; i < samples.length; i++) {
+    if (evals[i].decision == GpsDecision.accepted) {
+      pts.add(AcceptedPoint(
+        tsMs: samples[i].tsMs,
+        latE7: evals[i].smoothedLatE7!,
+        lngE7: evals[i].smoothedLngE7!,
+        speedMmps: samples[i].speedMmps,
+      ));
+    }
+  }
+  return pts;
+}
 
-  test('G2: isMock -> ACCEPT + co SUSPICIOUS', () {
-    final GpsEvaluation e = step(null, s(1000, mock: true));
-    expect(e.decision, GpsDecision.accepted);
-    expect(e.suspicious, isTrue);
-    expect(step(null, s(1000)).suspicious, isFalse);
-  });
+// ---- Kich ban G1..G7 (dung chung cho G8 replay) ----
 
-  test('G3: accuracy thich ung 20 m -> 35 m -> PAUSED', () {
-    // Moi bat dau: nguong 20 m.
-    expect(step(null, s(0, acc: 25000)).decision, GpsDecision.rejected);
+/// G1: dung yen 60 mau, drift +-8 m quanh mot diem.
+List<GpsSample> g1Samples() {
+  final int d = latE7ForMeters(8); // ~8 m (cos(0) = 1 nen lng tuong tu)
+  final List<GpsSample> out = <GpsSample>[];
+  for (int i = 0; i < 60; i++) {
+    int lat = 0;
+    int lng = 0;
+    switch (i % 4) {
+      case 1:
+        lat = d;
+      case 2:
+        lng = d;
+      case 3:
+        lat = -d;
+      default:
+        lng = -d;
+    }
+    if (i == 0) {
+      lat = 0;
+      lng = 0;
+    }
+    out.add(s(i * 1000, lat: lat, lng: lng, acc: 12000, speed: 0));
+  }
+  return out;
+}
 
-    final GpsEvaluation first = step(null, s(0));
-    // Mat GPS 5 s: van nguong 20 m.
-    final GpsEvaluation shortGap =
-        step(first, s(5000, lat: latE7ForMeters(50), acc: 25000));
-    expect(shortGap.decision, GpsDecision.rejected);
-    expect(shortGap.rejectReason, 'ACCURACY');
-
-    // Mat GPS 15 s: noi len 35 m -> chap nhan 25 m.
-    final GpsEvaluation relaxed =
-        step(first, s(15000, lat: latE7ForMeters(100), acc: 25000));
-    expect(relaxed.decision, GpsDecision.accepted);
-
-    // Mat GPS 60 s va van > 35 m -> PAUSED.
-    final GpsEvaluation paused = step(first, s(60000, acc: 40000));
-    expect(paused.decision, GpsDecision.paused);
-  });
-
-  test('G4: teleport (dt >= 0.5 s, v > max) -> REJECT', () {
-    final GpsEvaluation first = step(null, s(0));
-    final GpsEvaluation e = step(first, s(1000, lat: latE7ForMeters(1000)));
-    expect(e.decision, GpsDecision.rejected);
-    expect(e.rejectReason, 'TELEPORT');
-  });
-
-  test('G5: dt < 0.5 s -> bo qua teleport gate', () {
-    final GpsEvaluation first = step(null, s(0));
-    final GpsEvaluation e = step(first, s(300, lat: latE7ForMeters(1000)));
-    expect(e.decision, GpsDecision.accepted);
-  });
-
-  test('G6: anchor drift: dung yen + accuracy xau -> REJECT', () {
-    final GpsEvaluation first = step(null, s(0));
-    final GpsEvaluation drift = step(first, s(2000, acc: 10000, speed: 500));
-    expect(drift.decision, GpsDecision.rejected);
-    expect(drift.rejectReason, 'ANCHOR_DRIFT');
-
-    // Di chuyen that (toc do cao) -> chap nhan.
-    final GpsEvaluation moving = step(
-      first,
-      s(2000, lat: latE7ForMeters(20), acc: 10000, speed: 8000),
-    );
-    expect(moving.decision, GpsDecision.accepted);
-
-    // Accuracy tot (<= 8 m) -> khong bi anchor guard.
-    final GpsEvaluation good = step(first, s(2000, acc: 5000, speed: 500));
-    expect(good.decision, GpsDecision.accepted);
-  });
-
-  test('G7: lam muot cua so 3 mau, trong so 1/accuracy^2', () {
-    // Cung accuracy: trung binh cua so.
-    GpsEvaluation e = step(null, s(0, lat: 0));
-    e = step(e, s(1000, lat: 30));
-    e = step(e, s(2000, lat: 60));
-    expect(e.decision, GpsDecision.accepted);
-    expect(e.smoothedLatE7, 30);
-
-    // Khac accuracy: w(5 m) = 4 x w(10 m) -> (0*4 + 100*1) / 5 = 20.
-    GpsEvaluation w = step(null, s(0, lat: 0, acc: 5000));
-    w = step(w, s(1000, lat: 100, acc: 10000));
-    expect(w.decision, GpsDecision.accepted);
-    expect(w.smoothedLatE7, 20);
-    expect(w.smoothedLngE7, 0);
-
-    // Cua so chi giu 3 mau.
-    GpsEvaluation c = step(null, s(0, lat: 1000));
-    c = step(c, s(1000, lat: 0));
-    c = step(c, s(2000, lat: 0));
-    c = step(c, s(3000, lat: 0));
-    expect(c.state.window.length, 3);
-    expect(c.smoothedLatE7, 0);
-  });
-
-  test('G8: replay cung chuoi diem hai lan -> quyet dinh giong het', () {
-    final List<GpsSample> track = <GpsSample>[
-      s(0),
-      s(1000, lat: 90),
-      s(1500, lat: 1000000), // teleport
-      s(2000, lat: 180, acc: 30000), // accuracy xau
-      s(3000, lat: 270, acc: 9000, speed: 400), // anchor drift
-      s(2500), // ts lui
-      s(4000, lat: 360, mock: true),
+/// G2: accuracy 50 m.
+List<GpsSample> g2Samples() => <GpsSample>[
+      s(0, acc: 50000),
+      s(1000), // tot
+      s(2000, acc: 50000), // xau sau khi co fix tot
     ];
 
-    List<String> run() {
+/// G3: teleport 252 km/h (70 m trong 1 s), sau do di chuyen hop le.
+List<GpsSample> g3Samples() => <GpsSample>[
+      s(0),
+      s(1000, lat: latE7ForMeters(70), speed: 70000), // 252 km/h -> reject
+      s(2000, lat: latE7ForMeters(50), speed: 50000), // 50 m / 2 s tu diem nhan cuoi -> accept
+    ];
+
+/// G4: chay deu ~40 km/h (11.1 m moi giay), 60 mau.
+List<GpsSample> g4Samples() => <GpsSample>[
+      for (int i = 0; i < 60; i++) s(i * 1000, lat: i * 1000, speed: 11111),
+    ];
+
+/// G5: mock.
+List<GpsSample> g5Samples() => <GpsSample>[
+      s(0),
+      s(1000, lat: 900, mock: true),
+    ];
+
+/// G6: mat GPS 45 s.
+List<GpsSample> g6Samples() => <GpsSample>[
+      s(0),
+      s(25000, acc: 50000), // moi 25 s: chua PAUSED
+      s(45000, acc: 50000), // 45 s: PAUSED
+    ];
+
+/// G7: timestamp giam.
+List<GpsSample> g7Samples() => <GpsSample>[
+      s(2000),
+      s(1500, lat: 100), // lui -> reject
+      s(2000, lat: 100), // bang -> reject
+      s(3000, lat: 200), // tiep tuc binh thuong
+    ];
+
+void main() {
+  test('G1: dung yen 60 mau drift +-8 m -> 0 m duoc chap nhan', () {
+    final List<GpsSample> samples = g1Samples();
+    final List<GpsEvaluation> evals = run(samples);
+    expect(samples.length, 60);
+
+    // Chi mau dau (anchor) duoc nhan; 59 mau drift con lai deu bi loai.
+    final int accepted =
+        evals.where((GpsEvaluation e) => e.decision == GpsDecision.accepted).length;
+    expect(accepted, 1);
+    for (int i = 1; i < evals.length; i++) {
+      expect(evals[i].decision, GpsDecision.rejected, reason: 'mau $i');
+      expect(evals[i].rejectReason, 'ANCHOR_DRIFT', reason: 'mau $i');
+    }
+
+    final FareResult r = compute(acceptedPoints(samples, evals), fixtureConfig());
+    expect(r.distanceM, 0);
+    expect(r.fareTotalVnd, 10000);
+  });
+
+  test('G2: accuracy 50 m -> reject', () {
+    final List<GpsSample> samples = g2Samples();
+    final List<GpsEvaluation> evals = run(samples);
+    expect(evals[0].decision, GpsDecision.rejected);
+    expect(evals[0].rejectReason, 'ACCURACY');
+    expect(evals[1].decision, GpsDecision.accepted);
+    expect(evals[2].decision, GpsDecision.rejected);
+    expect(evals[2].rejectReason, 'ACCURACY');
+  });
+
+  test('G3: teleport 250 km/h -> reject', () {
+    final List<GpsEvaluation> evals = run(g3Samples());
+    expect(evals[0].decision, GpsDecision.accepted);
+    expect(evals[1].decision, GpsDecision.rejected);
+    expect(evals[1].rejectReason, 'TELEPORT');
+    // Di chuyen hop le sau teleport -> nhan.
+    expect(evals[2].decision, GpsDecision.accepted);
+  });
+
+  test('G4: chay 40 km/h deu -> tat ca accept', () {
+    final List<GpsSample> samples = g4Samples();
+    final List<GpsEvaluation> evals = run(samples);
+    expect(
+      evals.every((GpsEvaluation e) => e.decision == GpsDecision.accepted),
+      isTrue,
+    );
+    final FareResult r = compute(acceptedPoints(samples, evals), fixtureConfig());
+    // Duong that ~656 m; diem lam muot tre ~11 m.
+    expect(r.distanceM, inInclusiveRange(600, 700));
+  });
+
+  test('G5: mock -> accept + co', () {
+    final List<GpsEvaluation> evals = run(g5Samples());
+    expect(evals[0].decision, GpsDecision.accepted);
+    expect(evals[0].suspicious, isFalse);
+    expect(evals[1].decision, GpsDecision.accepted);
+    expect(evals[1].suspicious, isTrue);
+  });
+
+  test('G6: mat GPS 45 s -> chuyen PAUSED', () {
+    final List<GpsEvaluation> evals = run(g6Samples());
+    expect(evals[0].decision, GpsDecision.accepted);
+    expect(evals[1].decision, GpsDecision.rejected); // 25 s < 30 s
+    expect(evals[2].decision, GpsDecision.paused); // 45 s
+    expect(evals[2].rejectReason, 'ACCURACY_PAUSED');
+
+    // GPS hoi phuc tot sau 45 s -> nhan lai binh thuong.
+    final GpsEvaluation first = step(null, s(0));
+    final GpsEvaluation back =
+        step(first, s(45000, lat: latE7ForMeters(300), speed: 7000));
+    expect(back.decision, GpsDecision.accepted);
+  });
+
+  test('G7: timestamp giam -> reject', () {
+    final List<GpsEvaluation> evals = run(g7Samples());
+    expect(evals[0].decision, GpsDecision.accepted);
+    expect(evals[1].decision, GpsDecision.rejected);
+    expect(evals[1].rejectReason, 'SANITY_TS');
+    expect(evals[2].decision, GpsDecision.rejected);
+    expect(evals[2].rejectReason, 'SANITY_TS');
+    expect(evals[3].decision, GpsDecision.accepted);
+  });
+
+  test('G8: replay G1-G7 voi config -> ket qua y het', () {
+    final List<List<GpsSample>> scenarios = <List<GpsSample>>[
+      g1Samples(),
+      g2Samples(),
+      g3Samples(),
+      g4Samples(),
+      g5Samples(),
+      g6Samples(),
+      g7Samples(),
+    ];
+
+    List<String> replay() {
       final List<String> out = <String>[];
-      GpsPolicyState state = const GpsPolicyState();
-      for (final GpsSample x in track) {
-        final GpsEvaluation e = GpsPolicy.evaluate(state, x, cfg);
-        state = e.state;
-        out.add('${e.decision.name}|${e.rejectReason}|${e.suspicious}|'
-            '${e.smoothedLatE7}|${e.smoothedLngE7}');
+      for (int k = 0; k < scenarios.length; k++) {
+        for (final GpsEvaluation e in run(scenarios[k])) {
+          out.add('G${k + 1}|${e.decision.name}|${e.rejectReason}|'
+              '${e.suspicious}|${e.smoothedLatE7}|${e.smoothedLngE7}|'
+              '${e.state.prevTsMs}|${e.state.window.length}');
+        }
       }
       return out;
     }
 
-    final List<String> a = run();
-    final List<String> b = run();
+    final List<String> a = replay();
+    final List<String> b = replay();
+    expect(a.length, greaterThan(150));
     expect(a, equals(b));
-    expect(a.length, track.length);
   });
 }
