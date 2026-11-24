@@ -2,40 +2,38 @@
 // Thoi gian lay tu tsMs cua diem. Chi so nguyen.
 // Xem .github/skills/gps-and-offline-map/SKILL.md.
 
+import '../domain/models/gps_sample.dart';
+import '../domain/models/tariff_config_v2.dart';
 import 'geo.dart';
 
 enum GpsDecision { accepted, rejected, paused }
 
-class GpsSample {
-  const GpsSample({
-    required this.tsMs,
-    required this.latE7,
-    required this.lngE7,
-    required this.accuracyMm,
-    required this.speedMmps,
-    this.isMock = false,
-  });
-
-  final int tsMs;
-  final int latE7;
-  final int lngE7;
-  final int accuracyMm;
-  final int speedMmps;
-  final bool isMock;
-}
-
 class GpsPolicyConfig {
   const GpsPolicyConfig({
-    this.maxSpeedKmh = 200,
+    this.maxSpeedKmh = 120,
     this.strictAccuracyMm = 20000,
     this.relaxedAccuracyMm = 35000,
     this.relaxAfterMs = 10000,
     this.pauseAfterMs = 30000,
     this.minTeleportDtMs = 500,
+    this.anchorEnabled = true,
     this.anchorMaxSpeedMmps = 1500,
     this.anchorMinAccuracyMm = 8000,
-    this.anchorFactor = 2,
+    this.anchorRadiusPermille = 2000,
+    this.anchorMaxAgeMs = 30000,
   });
+
+  factory GpsPolicyConfig.fromRules(GpsRules r) {
+    return GpsPolicyConfig(
+      maxSpeedKmh: r.maxSpeedKmh,
+      strictAccuracyMm: r.maxAccuracyMm,
+      relaxedAccuracyMm: r.relaxedAccuracyMm,
+      anchorEnabled: r.anchorEnabled,
+      anchorMaxSpeedMmps: r.anchorMaxSpeedMmps,
+      anchorRadiusPermille: r.anchorRadiusPermille,
+      anchorMaxAgeMs: r.anchorMaxAgeMs,
+    );
+  }
 
   final int maxSpeedKmh;
   final int strictAccuracyMm;
@@ -47,9 +45,15 @@ class GpsPolicyConfig {
   /// Mat GPS >= pauseAfterMs ma van khong du do chinh xac -> PAUSED.
   final int pauseAfterMs;
   final int minTeleportDtMs;
+  final bool anchorEnabled;
   final int anchorMaxSpeedMmps;
   final int anchorMinAccuracyMm;
-  final int anchorFactor;
+
+  /// Ban kinh chong troi = anchorRadiusPermille/1000 x accuracy.
+  final int anchorRadiusPermille;
+
+  /// Neo cu hon so nay (tinh tu lan xac nhan gan nhat) thi bo qua guard.
+  final int anchorMaxAgeMs;
 }
 
 /// Trang thai bat bien; moi lan evaluate tra trang thai moi.
@@ -57,6 +61,7 @@ class GpsPolicyState {
   const GpsPolicyState({
     this.prevTsMs,
     this.lastAccepted,
+    this.anchorRefreshTsMs,
     this.window = const <GpsSample>[],
   });
 
@@ -65,6 +70,9 @@ class GpsPolicyState {
 
   /// Diem ACCEPTED cuoi cung (cung la anchor chong troi).
   final GpsSample? lastAccepted;
+
+  /// Lan cuoi anchor duoc "xac nhan" (nhan diem moi hoac loai diem do troi).
+  final int? anchorRefreshTsMs;
 
   /// Toi da 3 mau ACCEPTED gan nhat de lam muot.
   final List<GpsSample> window;
@@ -84,6 +92,8 @@ class GpsEvaluation {
   final GpsPolicyState state;
   final String? rejectReason;
   final bool suspicious;
+
+  /// Toa do lam muot, CHI de hien thi ban do. Tinh cuoc dung toa do tho.
   final int? smoothedLatE7;
   final int? smoothedLngE7;
 }
@@ -120,13 +130,15 @@ class GpsPolicy {
     final GpsPolicyState seen = GpsPolicyState(
       prevTsMs: s.tsMs,
       lastAccepted: last,
+      anchorRefreshTsMs: state.anchorRefreshTsMs,
       window: state.window,
     );
 
     // Tang 3: accuracy thich ung theo thoi gian mat GPS.
     final int gapMs = last == null ? 0 : s.tsMs - last.tsMs;
-    final int limit =
-        gapMs < cfg.relaxAfterMs ? cfg.strictAccuracyMm : cfg.relaxedAccuracyMm;
+    final int limit = gapMs < cfg.relaxAfterMs
+        ? cfg.strictAccuracyMm
+        : cfg.relaxedAccuracyMm;
     if (s.accuracyMm > limit) {
       final bool pause = last != null && gapMs >= cfg.pauseAfterMs;
       return GpsEvaluation(
@@ -160,19 +172,33 @@ class GpsPolicy {
       }
 
       // Tang 5: anchor drift (dung yen + accuracy xau + nam trong vung nhieu).
-      if (s.speedMmps < cfg.anchorMaxSpeedMmps &&
-          s.accuracyMm > cfg.anchorMinAccuracyMm &&
-          distMm < cfg.anchorFactor * s.accuracyMm) {
-        return GpsEvaluation(
-          decision: GpsDecision.rejected,
-          state: seen,
-          rejectReason: 'ANCHOR_DRIFT',
-          suspicious: suspicious,
-        );
+      // Toc do am (khong biet) -> suy ra tu vi tri so voi anchor.
+      if (cfg.anchorEnabled) {
+        final int refresh = state.anchorRefreshTsMs ?? last.tsMs;
+        final int ageMs = s.tsMs - refresh;
+        final int speed = s.speedMmps >= 0
+            ? s.speedMmps
+            : (gapMs > 0 ? distMm * 1000 ~/ gapMs : 0);
+        if (ageMs <= cfg.anchorMaxAgeMs &&
+            speed < cfg.anchorMaxSpeedMmps &&
+            s.accuracyMm > cfg.anchorMinAccuracyMm &&
+            distMm * 1000 < cfg.anchorRadiusPermille * s.accuracyMm) {
+          return GpsEvaluation(
+            decision: GpsDecision.rejected,
+            state: GpsPolicyState(
+              prevTsMs: s.tsMs,
+              lastAccepted: last,
+              anchorRefreshTsMs: s.tsMs,
+              window: state.window,
+            ),
+            rejectReason: 'ANCHOR_DRIFT',
+            suspicious: suspicious,
+          );
+        }
       }
     }
 
-    // Tang 6: lam muot cua so 3 mau, trong so 1/accuracy^2.
+    // Tang 6: lam muot cua so 3 mau, trong so 1/accuracy^2 (chi de hien thi).
     final List<GpsSample> win = <GpsSample>[...state.window, s];
     if (win.length > 3) {
       win.removeAt(0);
@@ -195,6 +221,7 @@ class GpsPolicy {
       state: GpsPolicyState(
         prevTsMs: s.tsMs,
         lastAccepted: s,
+        anchorRefreshTsMs: s.tsMs,
         window: List<GpsSample>.unmodifiable(win),
       ),
       suspicious: suspicious,

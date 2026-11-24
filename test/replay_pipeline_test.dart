@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ttx_taximeter_pro/core/geo.dart';
-import 'package:ttx_taximeter_pro/core/gps_policy.dart';
-import 'package:ttx_taximeter_pro/core/taximeter_engine.dart';
+import 'package:ttx/core/geo.dart';
+import 'package:ttx/core/taximeter_engine.dart';
+import 'package:ttx/domain/models/gps_sample.dart';
 
 import 'test_support.dart';
 
@@ -9,17 +9,15 @@ import 'test_support.dart';
 /// roi di tiep, kem vai diem nhieu.
 List<GpsSample> syntheticTrack() {
   final List<GpsSample> out = <GpsSample>[];
-  int ts = 0;
   int lat = 0;
   for (int i = 0; i < 300; i++) {
-    ts += 1000;
     final bool stopped = i >= 100 && i < 160;
     if (!stopped) {
-      lat += 120; // ~1.3 m / s ... du de khac 0
+      lat += 120;
     }
     final bool noisy = i % 37 == 0 && i > 0;
     out.add(GpsSample(
-      tsMs: ts,
+      tsMs: baseTsMs + (i + 1) * 1000,
       latE7: noisy ? lat + 4000 : lat,
       lngE7: i * 3,
       accuracyMm: noisy ? 30000 : 4000 + (i % 5) * 300,
@@ -30,30 +28,15 @@ List<GpsSample> syntheticTrack() {
   return out;
 }
 
-String runPipeline(List<GpsSample> track) {
-  GpsPolicyState state = const GpsPolicyState();
-  final List<AcceptedPoint> accepted = <AcceptedPoint>[];
-  for (final GpsSample s in track) {
-    final GpsEvaluation e = GpsPolicy.evaluate(state, s, const GpsPolicyConfig());
-    state = e.state;
-    if (e.decision == GpsDecision.accepted) {
-      accepted.add(AcceptedPoint(
-        tsMs: s.tsMs,
-        latE7: e.smoothedLatE7!,
-        lngE7: e.smoothedLngE7!,
-        speedMmps: s.speedMmps,
-      ));
-    }
-  }
-  final FareResult r = compute(accepted, fixtureConfig());
-  return '${accepted.length}|$r';
-}
-
 void main() {
   test('Replay pipeline GpsPolicy -> Engine: hai lan chay khop tung byte', () {
-    final String a = runPipeline(syntheticTrack());
-    final String b = runPipeline(syntheticTrack());
+    final FareResult a = compute(syntheticTrack(), fixtureConfig());
+    final FareResult b = compute(syntheticTrack(), fixtureConfig());
     expect(a, equals(b));
+    expect(a.toString(), b.toString());
+    expect(a.rejectedCount, greaterThan(0));
+    expect(a.waitingSec, greaterThan(0));
+    expect(a.suspiciousCount, 1);
   });
 
   test('geo: isqrt va khoang cach doi xung', () {

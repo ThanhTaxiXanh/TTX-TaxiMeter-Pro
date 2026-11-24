@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:test/test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:ttx/core/taximeter_engine.dart';
 import 'package:ttx/domain/models/tariff_config_v2.dart';
 import 'package:ttx/domain/models/gps_sample.dart';

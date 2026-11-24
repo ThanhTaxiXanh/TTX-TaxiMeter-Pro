@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ttx_taximeter_pro/core/gps_policy.dart';
-import 'package:ttx_taximeter_pro/core/taximeter_engine.dart';
+import 'package:ttx/core/gps_policy.dart';
+import 'package:ttx/core/taximeter_engine.dart';
+import 'package:ttx/domain/models/gps_sample.dart';
 
 import 'test_support.dart';
 
@@ -42,24 +43,6 @@ List<GpsEvaluation> run(List<GpsSample> samples) {
     out.add(e);
   }
   return out;
-}
-
-List<AcceptedPoint> acceptedPoints(
-  List<GpsSample> samples,
-  List<GpsEvaluation> evals,
-) {
-  final List<AcceptedPoint> pts = <AcceptedPoint>[];
-  for (int i = 0; i < samples.length; i++) {
-    if (evals[i].decision == GpsDecision.accepted) {
-      pts.add(AcceptedPoint(
-        tsMs: samples[i].tsMs,
-        latE7: evals[i].smoothedLatE7!,
-        lngE7: evals[i].smoothedLngE7!,
-        speedMmps: samples[i].speedMmps,
-      ));
-    }
-  }
-  return pts;
 }
 
 // ---- Kich ban G1..G7 (dung chung cho G8 replay) ----
@@ -145,9 +128,10 @@ void main() {
       expect(evals[i].rejectReason, 'ANCHOR_DRIFT', reason: 'mau $i');
     }
 
-    final FareResult r = compute(acceptedPoints(samples, evals), fixtureConfig());
+    final FareResult r = compute(samples, fixtureConfig());
+    expect(r.acceptedCount, 1);
     expect(r.distanceM, 0);
-    expect(r.fareTotalVnd, 10000);
+    expect(r.fareTotal, 10000);
   });
 
   test('G2: accuracy 50 m -> reject', () {
@@ -176,9 +160,10 @@ void main() {
       evals.every((GpsEvaluation e) => e.decision == GpsDecision.accepted),
       isTrue,
     );
-    final FareResult r = compute(acceptedPoints(samples, evals), fixtureConfig());
-    // Duong that ~656 m; diem lam muot tre ~11 m.
-    expect(r.distanceM, inInclusiveRange(600, 700));
+    final FareResult r = compute(samples, fixtureConfig());
+    expect(r.acceptedCount, 60);
+    // 59 doan x ~11.1 m = ~656 m (toa do tho, khong bi lam muot lam hut).
+    expect(r.distanceM, inInclusiveRange(650, 662));
   });
 
   test('G5: mock -> accept + co', () {

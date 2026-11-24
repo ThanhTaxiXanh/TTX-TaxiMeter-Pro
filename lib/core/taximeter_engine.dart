@@ -3,180 +3,258 @@
 
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart';
+import 'package:crypto/crypto.dart' as crypto;
 
+import '../domain/models/gps_sample.dart';
+import '../domain/models/tariff_config_v2.dart';
 import 'geo.dart';
-import 'tariff_config.dart';
+import 'gps_policy.dart';
 
-/// Thang trung gian: VND x 60000. Lam tron dung 1 lan o buoc cuoi.
-const int fareScale = 60000;
-
-/// Diem GPS da duoc GpsPolicy chap nhan (toa do da lam muot).
-class AcceptedPoint {
-  const AcceptedPoint({
-    required this.tsMs,
-    required this.latE7,
-    required this.lngE7,
-    required this.speedMmps,
-  });
-
-  final int tsMs;
-  final int latE7;
-  final int lngE7;
-  final int speedMmps;
-}
+/// Thang trung gian: VND x 18000 (= BCNN(1000, 3600) de don gia VND/km va
+/// VND/gio deu ra so nguyen). Lam tron dung 1 lan o buoc cuoi.
+const int fareScale = 18000;
+const int _scalePerMeterPerKm = fareScale ~/ 1000; // 18
+const int _scalePerSecondPerHour = fareScale ~/ 3600; // 5
 
 class FareResult {
   const FareResult({
+    required this.acceptedCount,
+    required this.rejectedCount,
+    required this.pausedCount,
+    required this.suspiciousCount,
     required this.distanceM,
     required this.calibratedM,
     required this.billableM,
     required this.waitingSec,
     required this.waitingBillableSec,
-    required this.fareOpeningVnd,
-    required this.fareDistanceVnd,
-    required this.fareWaitingVnd,
-    required this.fareSurchargeVnd,
-    required this.fareTotalVnd,
+    required this.fareOpening,
+    required this.fareDistance,
+    required this.fareWaiting,
+    required this.fareSurcharge,
+    required this.fareTotal,
     required this.fareHash,
   });
 
-  /// Tong quang duong tho giua cac diem ACCEPTED (m, nguyen).
+  final int acceptedCount;
+  final int rejectedCount;
+  final int pausedCount;
+  final int suspiciousCount;
+
+  /// Quang duong tho (m, nguyen) giua cac diem ACCEPTED, da bo cac doan cho
+  /// (EXCLUSIVE_FROM_DISTANCE).
   final int distanceM;
   final int calibratedM;
   final int billableM;
 
-  /// Tong thoi gian o trang thai WAITING (giay, cat xuong).
+  /// Tong giay o trang thai cho (dot cho >= minWaitSegmentSeconds).
   final int waitingSec;
 
-  /// So giay cho bi tinh tien (sau grace va counting policy).
+  /// Giay cho bi tinh tien (da tru grace tung dot).
   final int waitingBillableSec;
-  final int fareOpeningVnd;
-  final int fareDistanceVnd;
-  final int fareWaitingVnd;
+  final int fareOpening;
+  final int fareDistance;
+  final int fareWaiting;
 
-  /// Thanh phan thong tin: = total - (opening + distance + waiting), da gom
-  /// phan phu phi va chenh lech do lam tron mot lan cuoi. `fareTotalVnd` la
-  /// so co tham quyen.
-  final int fareSurchargeVnd;
-  final int fareTotalVnd;
+  /// Phan phu phi thuan (sau - truoc khi ap phu phi). Khong gom chenh lech
+  /// do lam tron.
+  final int fareSurcharge;
+
+  /// So tien khach tra (da lam tron 1 lan). Day la so co tham quyen.
+  final int fareTotal;
   final String fareHash;
+
+  Map<String, Object> toJson() => <String, Object>{
+        'accepted': acceptedCount,
+        'rejected': rejectedCount,
+        'paused': pausedCount,
+        'suspicious': suspiciousCount,
+        'distance_m': distanceM,
+        'calibrated_m': calibratedM,
+        'billable_m': billableM,
+        'waiting_sec': waitingSec,
+        'waiting_billable_sec': waitingBillableSec,
+        'fare_opening_vnd': fareOpening,
+        'fare_distance_vnd': fareDistance,
+        'fare_waiting_vnd': fareWaiting,
+        'fare_surcharge_vnd': fareSurcharge,
+        'fare_total_vnd': fareTotal,
+        'fare_hash': fareHash,
+      };
 
   @override
   bool operator ==(Object other) =>
-      other is FareResult &&
-      other.distanceM == distanceM &&
-      other.calibratedM == calibratedM &&
-      other.billableM == billableM &&
-      other.waitingSec == waitingSec &&
-      other.waitingBillableSec == waitingBillableSec &&
-      other.fareOpeningVnd == fareOpeningVnd &&
-      other.fareDistanceVnd == fareDistanceVnd &&
-      other.fareWaitingVnd == fareWaitingVnd &&
-      other.fareSurchargeVnd == fareSurchargeVnd &&
-      other.fareTotalVnd == fareTotalVnd &&
-      other.fareHash == fareHash;
+      other is FareResult && jsonEncode(other.toJson()) == jsonEncode(toJson());
 
   @override
   int get hashCode => fareHash.hashCode;
 
   @override
-  String toString() =>
-      'FareResult(distanceM: $distanceM, waitingSec: $waitingSec, '
-      'total: $fareTotalVnd, hash: $fareHash)';
+  String toString() => jsonEncode(toJson());
 }
 
 class TaximeterEngine {
   const TaximeterEngine._();
 
-  /// fareHash = sha256(configSha256 + fareTotalVnd + tripId), noi chuoi
-  /// thap phan, UTF-8, khong dau phan cach.
+  /// fareHash = sha256(utf8(configSha256 + fareTotalVnd + tripId)), noi chuoi
+  /// thap phan, khong dau phan cach, hex thuong.
   static String fareHash({
     required String configSha256,
     required int fareTotalVnd,
     required String tripId,
   }) {
     final List<int> bytes = utf8.encode('$configSha256$fareTotalVnd$tripId');
-    return sha256.convert(bytes).toString();
+    return crypto.sha256.convert(bytes).toString();
   }
 
+  /// Tinh cuoc tu GPS tho: GpsPolicy loc -> quang duong (toa do tho) ->
+  /// cho -> bac thang -> phu phi -> lam tron 1 lan.
   static FareResult compute({
-    required List<AcceptedPoint> points,
+    required List<GpsSample> samples,
     required TariffConfigV2 config,
-    required String configSha256,
-    required String tripId,
+    required SurchargeContexts contexts,
+    String tripId = '',
   }) {
-    // 1. Quang duong tich luy (mm -> m, cat xuong).
+    // 1. Loc GPS.
+    final GpsPolicyConfig policy = GpsPolicyConfig.fromRules(config.gps);
+    GpsPolicyState state = const GpsPolicyState();
+    final List<GpsSample> acc = <GpsSample>[];
+    int rejected = 0;
+    int paused = 0;
+    int suspicious = 0;
+    for (final GpsSample s in samples) {
+      final GpsEvaluation e = GpsPolicy.evaluate(state, s, policy);
+      state = e.state;
+      if (e.suspicious) suspicious++;
+      switch (e.decision) {
+        case GpsDecision.accepted:
+          acc.add(s);
+        case GpsDecision.rejected:
+          rejected++;
+        case GpsDecision.paused:
+          paused++;
+      }
+    }
+
+    // 2. Cac doan (i-1 -> i) giua cac diem ACCEPTED.
+    final int segCount = acc.length < 2 ? 0 : acc.length - 1;
+    final List<int> dtMs = List<int>.filled(segCount, 0);
+    final List<int> distMm = List<int>.filled(segCount, 0);
+    final List<int> speed = List<int>.filled(segCount, 0);
+    for (int j = 0; j < segCount; j++) {
+      final GpsSample a = acc[j];
+      final GpsSample b = acc[j + 1];
+      dtMs[j] = b.tsMs - a.tsMs;
+      distMm[j] = distanceMm(a.latE7, a.lngE7, b.latE7, b.lngE7);
+      // Toc do bao cao (>= 0) duoc uu tien; am = khong biet -> suy ra.
+      speed[j] = b.speedMmps >= 0
+          ? b.speedMmps
+          : (dtMs[j] > 0 ? distMm[j] * 1000 ~/ dtMs[j] : 0);
+    }
+
+    // 3. Cho: hysteresis theo tung doan, gom thanh cac dot.
+    final WaitingPolicy wp = config.waiting;
+    final int enterMmps = wp.enterThresholdKmh * 1000000 ~/ 3600;
+    final int exitMmps = wp.exitThresholdKmh * 1000000 ~/ 3600;
+    final List<bool> waitingSeg = List<bool>.filled(segCount, false);
+    bool inWait = false;
+    for (int j = 0; j < segCount; j++) {
+      if (!inWait && speed[j] < enterMmps) {
+        inWait = true;
+      } else if (inWait && speed[j] > exitMmps) {
+        inWait = false;
+      }
+      waitingSeg[j] = inWait;
+    }
+
+    final int minWaitMs = wp.minWaitSegmentSeconds * 1000;
+    final int graceMs = wp.graceSeconds * 1000;
+    final List<bool> excluded = List<bool>.filled(segCount, false);
+    int waitingMs = 0;
+    int billableSec = 0;
+    int idx = 0;
+    while (idx < segCount) {
+      if (!waitingSeg[idx]) {
+        idx++;
+        continue;
+      }
+      int k = idx;
+      int episodeMs = 0;
+      while (k < segCount && waitingSeg[k]) {
+        episodeMs += dtMs[k];
+        k++;
+      }
+      if (episodeMs >= minWaitMs) {
+        waitingMs += episodeMs;
+        final int over = episodeMs - graceMs;
+        if (over > 0) billableSec += over ~/ 1000;
+        // EXCLUSIVE_FROM_DISTANCE: doan trong dot cho khong tinh quang duong.
+        for (int q = idx; q < k; q++) {
+          excluded[q] = true;
+        }
+      }
+      idx = k;
+    }
+
+    // 4. Quang duong, hieu chuan, quang duong tinh tien.
     int totalMm = 0;
-    for (int i = 1; i < points.length; i++) {
-      totalMm += distanceMm(
-        points[i - 1].latE7,
-        points[i - 1].lngE7,
-        points[i].latE7,
-        points[i].lngE7,
-      );
+    for (int q = 0; q < segCount; q++) {
+      if (!excluded[q]) totalMm += distMm[q];
     }
     final int distanceM = totalMm ~/ 1000;
-
-    // 2-3. Hieu chuan va quang duong tinh tien.
-    final int f = config.calibrationFactorPermille;
+    final int f = config.gps.calibrationFactorPermille;
     final int inc = config.opening.includedMeters;
-    final int calibratedM;
+    final int calibratedM = distanceM * f ~/ 1000;
     final int billableM;
-    switch (config.calibrationMode) {
-      case CalibrationMode.beforeOpeningKm:
-        calibratedM = distanceM * f ~/ 1000;
+    switch (config.gps.calibrationOrder) {
+      case CalibrationOrder.beforeOpeningKm:
         billableM = _max0(calibratedM - inc);
-      case CalibrationMode.afterOpeningKm:
-        calibratedM = distanceM * f ~/ 1000;
+      case CalibrationOrder.afterOpeningKm:
         billableM = _max0(distanceM - inc) * f ~/ 1000;
     }
 
-    // 4. Luy tien bac thang (thang fareScale).
-    final int distScaled = _tieredScaled(billableM, config.tiers);
-
-    // 5. Cho (hysteresis + grace + counting).
-    final _Waiting w = _waiting(points, config.waiting);
-    final int waitScaled = w.billableSec * config.waiting.ratePerMinVnd * 1000;
-
-    // 6. Gia co ban.
+    // 5. Thanh phan cuoc (thang fareScale).
     final int openingScaled = config.opening.fareVnd * fareScale;
-    int scaled = openingScaled + distScaled + waitScaled;
+    final int distScaled = _tieredScaled(billableM, config.tiers);
+    final int waitScaled =
+        billableSec * wp.ratePerHourVnd * _scalePerSecondPerHour;
+    final int baseScaled = openingScaled + distScaled + waitScaled;
 
-    // 7. Phu phi: nhan permille lien tiep, sau do cong co dinh.
-    for (final Surcharge s in config.surcharges) {
+    // 6. Phu phi: nhan tung thanh phan, sau do cong co dinh.
+    int o = openingScaled;
+    int d = distScaled;
+    int w = waitScaled;
+    int fixedScaled = 0;
+    for (final Surcharge s in _activeSurcharges(config, contexts)) {
       if (s.kind == SurchargeKind.multiplier) {
-        scaled = scaled * s.permille ~/ 1000;
+        if (s.appliesTo.contains('opening')) o = o * s.valuePermille ~/ 1000;
+        if (s.appliesTo.contains('distance')) d = d * s.valuePermille ~/ 1000;
+        if (s.appliesTo.contains('waiting')) w = w * s.valuePermille ~/ 1000;
+      } else {
+        fixedScaled += s.valueVnd * fareScale;
       }
     }
-    for (final Surcharge s in config.surcharges) {
-      if (s.kind == SurchargeKind.fixed) {
-        scaled += s.fixedVnd * fareScale;
-      }
-    }
+    final int afterScaled = o + d + w + fixedScaled;
 
-    // 8. Lam tron dung mot lan.
-    final int total = _roundScaled(scaled, config.rounding);
-
-    final int fareDistanceVnd = distScaled ~/ fareScale;
-    final int fareWaitingVnd = waitScaled ~/ fareScale;
-    final int fareOpeningVnd = config.opening.fareVnd;
-    final int surchargePart =
-        total - (fareOpeningVnd + fareDistanceVnd + fareWaitingVnd);
+    // 7. Lam tron dung 1 lan.
+    final int total = _roundScaled(afterScaled, config.rounding);
 
     return FareResult(
+      acceptedCount: acc.length,
+      rejectedCount: rejected,
+      pausedCount: paused,
+      suspiciousCount: suspicious,
       distanceM: distanceM,
       calibratedM: calibratedM,
       billableM: billableM,
-      waitingSec: w.rawSec,
-      waitingBillableSec: w.billableSec,
-      fareOpeningVnd: fareOpeningVnd,
-      fareDistanceVnd: fareDistanceVnd,
-      fareWaitingVnd: fareWaitingVnd,
-      fareSurchargeVnd: surchargePart,
-      fareTotalVnd: total,
+      waitingSec: waitingMs ~/ 1000,
+      waitingBillableSec: billableSec,
+      fareOpening: config.opening.fareVnd,
+      fareDistance: distScaled ~/ fareScale,
+      fareWaiting: waitScaled ~/ fareScale,
+      fareSurcharge: (afterScaled - baseScaled) ~/ fareScale,
+      fareTotal: total,
       fareHash: fareHash(
-        configSha256: configSha256,
+        configSha256: config.contentSha256,
         fareTotalVnd: total,
         tripId: tripId,
       ),
@@ -185,6 +263,7 @@ class TaximeterEngine {
 
   static int _max0(int v) => v < 0 ? 0 : v;
 
+  /// Luy tien bac thang tren billableM; bien upToMeters inclusive.
   static int _tieredScaled(int billableM, List<DistanceTier> tiers) {
     int scaled = 0;
     int prevUp = 0;
@@ -194,80 +273,49 @@ class TaximeterEngine {
       final int top = billableM < up ? billableM : up;
       final int meters = top - prevUp;
       if (meters > 0) {
-        // rate VND/km * m / 1000 VND = rate * m * 60 / fareScale.
-        scaled += t.ratePerKmVnd * meters * 60;
+        scaled += t.pricePerKmVnd * meters * _scalePerMeterPerKm;
       }
       prevUp = up;
     }
     return scaled;
   }
 
+  /// Phu phi dang hieu luc theo thu tu pipeline, gioi han so lop xep chong.
+  static List<Surcharge> _activeSurcharges(
+    TariffConfigV2 config,
+    SurchargeContexts ctx,
+  ) {
+    final List<Surcharge> ordered = <Surcharge>[];
+    for (final String id in config.pipeline.order) {
+      for (final Surcharge s in config.surcharges) {
+        if (s.id == id && !ordered.contains(s)) ordered.add(s);
+      }
+    }
+    for (final Surcharge s in config.surcharges) {
+      if (!ordered.contains(s)) ordered.add(s);
+    }
+    final List<Surcharge> matched =
+        ordered.where((Surcharge s) => s.matches(ctx)).toList();
+    final int limit = config.pipeline.allowStacking
+        ? config.pipeline.maxStackCount
+        : 1;
+    if (matched.length > limit) {
+      return matched.sublist(0, limit);
+    }
+    return matched;
+  }
+
   static int _roundScaled(int scaled, RoundingPolicy r) {
-    final int step = r.stepVnd < 1 ? 1 : r.stepVnd;
-    final int stepScaled = step * fareScale;
+    final int unitScaled = r.unitVnd * fareScale;
     final int units;
     switch (r.mode) {
       case RoundingMode.halfUp:
-        units = (scaled + stepScaled ~/ 2) ~/ stepScaled;
-      case RoundingMode.up:
-        units = (scaled + stepScaled - 1) ~/ stepScaled;
-      case RoundingMode.down:
-        units = scaled ~/ stepScaled;
+        units = (scaled + unitScaled ~/ 2) ~/ unitScaled;
+      case RoundingMode.ceil:
+        units = (scaled + unitScaled - 1) ~/ unitScaled;
+      case RoundingMode.floor:
+        units = scaled ~/ unitScaled;
     }
-    return units * step;
+    return units * r.unitVnd;
   }
-
-  /// Trang thai cho tai diem i ap dung cho khoang (i-1, i].
-  static _Waiting _waiting(List<AcceptedPoint> pts, WaitingPolicy p) {
-    final int enterMmps = p.enterThresholdKmh * 1000000 ~/ 3600;
-    final int exitMmps = p.exitThresholdKmh * 1000000 ~/ 3600;
-    final int graceMs = p.graceSeconds * 1000;
-
-    bool waiting = false;
-    int episodeMs = 0;
-    int rawMs = 0;
-    int billableSec = 0;
-
-    int closeEpisode(int ms) {
-      final int over = ms - graceMs;
-      if (over <= 0) return 0;
-      switch (p.counting) {
-        case WaitingCounting.perSecond:
-          return over ~/ 1000;
-        case WaitingCounting.perFullMinuteFloor:
-          return (over ~/ 60000) * 60;
-        case WaitingCounting.perMinuteCeil:
-          return ((over + 59999) ~/ 60000) * 60;
-      }
-    }
-
-    for (int i = 1; i < pts.length; i++) {
-      final int speed = pts[i].speedMmps;
-      if (!waiting && speed < enterMmps) {
-        waiting = true;
-      } else if (waiting && speed > exitMmps) {
-        waiting = false;
-        billableSec += closeEpisode(episodeMs);
-        episodeMs = 0;
-      }
-      if (waiting) {
-        final int dt = pts[i].tsMs - pts[i - 1].tsMs;
-        if (dt > 0) {
-          episodeMs += dt;
-          rawMs += dt;
-        }
-      }
-    }
-    if (waiting) {
-      billableSec += closeEpisode(episodeMs);
-    }
-    return _Waiting(rawMs ~/ 1000, billableSec);
-  }
-}
-
-class _Waiting {
-  const _Waiting(this.rawSec, this.billableSec);
-
-  final int rawSec;
-  final int billableSec;
 }
