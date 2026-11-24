@@ -1,0 +1,86 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [main, develop, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect Flutter project
+        id: detect
+        run: |
+          if [ -f pubspec.yaml ]; then
+            echo "has_flutter=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_flutter=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Chưa có pubspec.yaml (Phase 0). Bỏ qua build Flutter."
+          fi
+
+      - uses: actions/setup-java@v4
+        if: steps.detect.outputs.has_flutter == 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        if: steps.detect.outputs.has_flutter == 'true'
+        with:
+          channel: stable
+          flutter-version: '3.24.x'
+          cache: true
+
+      - name: Audit nhanh (PURE core, không mạng ngoài)
+        if: steps.detect.outputs.has_flutter == 'true'
+        run: |
+          if [ -d lib/core ]; then
+            if grep -rnE "DateTime\.now|Random\(" lib/core; then
+              echo "::error::lib/core không được dùng DateTime.now/Random"; exit 1
+            fi
+          fi
+          if grep -niE "google_maps|mapbox|vietqr" pubspec.yaml; then
+            echo "::error::Dependency bị cấm trong pubspec.yaml"; exit 1
+          fi
+
+      - name: flutter pub get
+        if: steps.detect.outputs.has_flutter == 'true'
+        run: flutter pub get
+
+      - name: build_runner (Drift)
+        if: steps.detect.outputs.has_flutter == 'true'
+        run: |
+          if grep -q "drift_dev" pubspec.yaml; then
+            dart run build_runner build --delete-conflicting-outputs
+          else
+            echo "Không dùng Drift, bỏ qua build_runner"
+          fi
+
+      - name: flutter analyze
+        if: steps.detect.outputs.has_flutter == 'true'
+        run: flutter analyze
+
+      - name: flutter test
+        if: steps.detect.outputs.has_flutter == 'true'
+        run: flutter test --reporter expanded
+
+      - name: Build APK release (split-per-abi)
+        if: steps.detect.outputs.has_flutter == 'true'
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload APK
+        if: steps.detect.outputs.has_flutter == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ttx-taximeter-apks
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
