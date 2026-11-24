@@ -238,7 +238,9 @@ void main() {
 
     final List<String> a = replay();
     final List<String> b = replay();
-    expect(a.length, greaterThan(150));
+    final int expectedCount =
+        scenarios.fold<int>(0, (int n, List<GpsSample> sc) => n + sc.length);
+    expect(a.length, expectedCount);
     expect(a, equals(b));
   });
 }

@@ -4,6 +4,7 @@
 
 ## Trạng thái hiện tại
 - **Phase hiện tại:** Phase 1 — đang làm. **1a XONG** (CI xanh: `flutter analyze` sạch, 23 test pass): pubspec đầy đủ dependency, `lib/core/` (geo, TariffConfigV2, GpsPolicy, TaximeterEngine), test T1–T12, G1–G8, replay pipeline.
+- **Golden replay:** 5 chuyến thật (GPX Odo → CSV số nguyên trong `test/golden/`, công cụ `tool/gpx_to_csv.py`) chạy GpsPolicy → Engine (biểu giá fixture, accuracy cố định 5 m vì GPX không có accuracy), so khớp byte-for-byte `*.expected.json`; khoảng cách engine ≈ 99,0–99,6% haversine độc lập. Cả 5 chuyến đều không bị lọc điểm nào (GPX đã được app Odo lọc sẵn) nên gate accuracy/anchor chỉ được kiểm bằng G1–G8. Test G1–G8 viết lại theo đặc tả của chủ dự án (G1 drift ±8 m, G2 accuracy 50 m, G3 teleport 250 km/h, G4 40 km/h đều, G5 mock, G6 mất GPS 45 s → PAUSED, G7 timestamp giảm, G8 replay G1–G7).
 - **Next (1b):** thư mục `android/` (Kotlin DSL, minSdk 24, targetSdk 34, coreLibraryDesugaring) để build APK; **(1c):** Drift schema + migrations (Mục 4 master prompt) + test migration; **(1d):** golden GPX mẫu nếu có sẵn (chủ dự án cung cấp 5 file GPX, hoặc tạo tổng hợp).
 - CI bỏ qua build APK khi chưa có `android/`.
 
@@ -44,11 +45,11 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - Chưa chốt: định dạng `state_json` (làm ở Phase 2 cùng TripActiveController).
 
 ## Việc còn chờ chủ dự án
-- Điều cấm thứ 10 (đã có 9) và ý nghĩa test "E8".
+- Ý nghĩa test "E8" (chủ dự án đã chốt còn 9 điều cấm; coi E8 = replay G8).
 - Tài nguyên `traffic_signs.geojson` đang rỗng/chưa đưa vào repo (dùng ở Phase 5).
-- 5 file GPX mẫu cho golden replay (Phase 7), nếu có.
 
 ## Nhật ký
+- 2026-11-24: Thêm 5 GPX golden replay + expected; viết lại test G1–G8 theo đặc tả chủ dự án; chủ dự án rút gọn còn 9 điều cấm (commit c949a12).
 - 2026-11-24: Phase 1a — pubspec, lib/core (geo, tariff_config, gps_policy, taximeter_engine), 23 test; CI xanh; sửa audit CI chỉ khớp khóa dependency thật.
 - 2026-11-24: Thay danh sách điều cấm bằng bản chính thức của chủ dự án.
 - 2026-11-24: Phase 0 — tạo `.github/copilot-instructions.md`, 2 agent, 4 SKILL.md, `flutter-ci.yml`, `docs/CONTEXT_STATE.md`.

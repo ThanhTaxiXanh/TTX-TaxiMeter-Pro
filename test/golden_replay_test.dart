@@ -138,15 +138,18 @@ void main() {
       final Outcome b = replay(slug, raw);
       expect(a.json, equals(b.json), reason: 'replay hai lan phai y het');
 
+      // Doi chieu doc lap: quang duong engine ~ haversine tren diem tho
+      // (lam muot + equirectangular nen hoi ngan hon, khong dai hon).
       final int ref = haversineRefM(raw);
-      // ignore: avoid_print
-      print('GOLDEN_JSON ${a.json} ref_m=$ref');
+      expect(a.distanceM, lessThanOrEqualTo(ref * 1005 ~/ 1000));
+      expect(a.distanceM, greaterThanOrEqualTo(ref * 98 ~/ 100));
 
       final File expected = File('test/golden/$slug.expected.json');
-      if (!expected.existsSync()) {
-        markTestSkipped('chua co $slug.expected.json (che do ghi)');
-        return;
-      }
+      expect(
+        expected.existsSync(),
+        isTrue,
+        reason: 'thieu $slug.expected.json: golden phai duoc ghi lai co chu dich',
+      );
       expect(a.json, equals(expected.readAsStringSync().trim()));
     });
   }
