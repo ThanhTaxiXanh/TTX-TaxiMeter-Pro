@@ -29,7 +29,7 @@
 7. **VietQR offline 100%.** Tự sinh EMVCo TLV + CRC16, không gọi API ngoài, không dùng package vietqr.
 8. **Hiển thị tốc độ chuẩn Việt Nam.** Biển giới hạn tốc độ viền đỏ nền trắng chữ đen (QCVN), tốc độ mặc định theo loại đường, chạm biển trên map để override nhanh.
 
-## Điều cấm (do chủ dự án quy định — nguồn chính thức)
+## Điều cấm (BẮT BUỘC)
 1. ❌ Không dùng Google Maps API, Mapbox, hay bất kỳ tile server trả phí.
 2. ❌ Không gọi `img.vietqr.io` hay API ngoài khi sinh QR.
 3. ❌ Không dùng `double` cho tiền/khoảng cách/thời gian.
@@ -39,8 +39,6 @@
 7. ❌ Không upload bất kỳ dữ liệu nào lên server.
 8. ❌ Không dùng package vietqr có sẵn — tự implement.
 9. ❌ Không bỏ qua test replay (E8/G8) — đây là test quan trọng nhất.
-
-(Chủ dự án nói "10 điều" nhưng liệt kê 9. Điều thứ 10 đang chờ chủ dự án bổ sung.)
 
 Quy tắc phụ rút ra từ prompt gốc (đề xuất, không thay thế danh sách trên): `lib/core` không dùng `DateTime.now()`/`Random()`/I/O; không lưu số tài khoản ngân hàng dạng rõ trong DB/backup; đổi schema phải có migration + test; không sang Phase mới khi CI chưa xanh.
 
