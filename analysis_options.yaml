@@ -1,0 +1,8 @@
+analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true
+  errors:
+    # Tien/khoang cach/thoi gian chi dung int; xem .github/copilot-instructions.md
+    missing_return: error
+    dead_code: warning
