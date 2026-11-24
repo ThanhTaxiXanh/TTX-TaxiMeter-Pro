@@ -1,0 +1,42 @@
+{
+  "_notes": "Test surcharge đêm: chuyến bắt đầu 21:55 (TRƯỚC 22:00), kết thúc 22:35 (SAU 22:00). Vì evaluationBasis = TRIP_START_TIME → KHÔNG áp surcharge đêm. Nếu engine áp theo giờ kết thúc hoặc giao thời gian → sẽ FAIL và cần sửa.",
+  "fixtureVersion": 1,
+  "tripId": "fixture-trip-004",
+  "description": "Chuyến 15 km, bắt đầu 21:55, kết thúc 22:35",
+  "startedAt": 1795532100000,
+  "startedAtIso": "2026-11-24T21:55:00+07:00",
+  "endedAt": 1795534500000,
+  "endedAtIso": "2026-11-24T22:35:00+07:00",
+  "configInheritFrom": "trip_001_short_2km_daytime.json",
+  "contexts": {
+    "tripStartTimeMs": 1795532100000,
+    "timezone": "Asia/Ho_Chi_Minh",
+    "vehicleType": "CAR_4",
+    "geofenceMatches": []
+  },
+  "samples": [
+    { "ts_ms": 1795532100000, "lat_e7": 107769000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795532400000, "lat_e7": 107937435, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795532700000, "lat_e7": 108105870, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795533000000, "lat_e7": 108274305, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795533300000, "lat_e7": 108442740, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795533600000, "lat_e7": 108611175, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795533900000, "lat_e7": 108779610, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795534200000, "lat_e7": 108948045, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795534500000, "lat_e7": 109116480, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" }
+  ],
+  "expected": {
+    "_formula": "distance ≈ 15000m; billableM = 14500; tier1 = 14500 × 14.5 = 210250; KHÔNG surcharge (start 21:55 < 22:00, mặc dù end 22:35); base = 12000 + 210250 = 222250; round → 222000",
+    "_critical": "Nếu fare_surcharge_vnd > 0 → engine dùng SAI evaluationBasis (end time hoặc overlap). Cần sửa để dùng tripStartTimeMs.",
+    "distance_m_approx": 15000,
+    "distance_tolerance_m": 30,
+    "waiting_sec": 0,
+    "fare_opening_vnd": 12000,
+    "fare_distance_vnd_approx": 210250,
+    "fare_distance_vnd_tolerance": 1000,
+    "fare_waiting_vnd": 0,
+    "fare_surcharge_vnd": 0,
+    "fare_total_vnd": 222000,
+    "currency": "VND"
+  }
+}
