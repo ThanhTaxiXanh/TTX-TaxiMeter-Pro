@@ -11,21 +11,18 @@ File: `lib/core/taximeter_engine.dart` (PURE). Đầu vào: danh sách điểm A
 - Chỉ `int`. Mét, giây, VND, permille. Không `double`, không `DateTime.now()`, không `Random`, không I/O.
 - Cùng đầu vào → cùng kết quả byte-for-byte.
 
-## Thuật toán
-1. `cumulativeDistanceM`: tổng khoảng cách giữa các điểm ACCEPTED liên tiếp, làm tròn về mét nguyên theo cùng một hàm cố định (haversine số nguyên hoặc equirectangular từ lat_e7/lng_e7; chọn 1 cách ở Phase 1 và ghi vào CONTEXT_STATE, không đổi sau đó).
-2. `calibratedM = cumulativeDistanceM * calibrationFactorPermille ~/ 1000` (áp dụng BEFORE_OPENING_KM hoặc AFTER_OPENING_KM theo config).
-3. `billableM = max(0, calibratedM - opening.includedMeters)`.
-4. Lũy tiến bậc thang trên `billableM`: mỗi bậc có `upToMeters` (inclusive, theo tổng billableM) và đơn giá VND/km. Mét nào rơi vào bậc nào tính theo bậc đó.
-5. `waitingFare`: chỉ cộng khi state = WAITING.
-   - Hysteresis: vào WAITING khi tốc độ < `enterThresholdKmh`, ra khi > `exitThresholdKmh` (exit > enter).
-   - Trừ `graceSeconds` đầu mỗi đợt chờ, tính phần còn lại theo `countingPolicy`.
-6. `baseFare = opening + distance + waiting` (VND).
-7. Phụ phí MULTIPLIER: `baseFare * Π(permille) ~/ 1000` — một phép nhân trên tổng baseFare. Phụ phí FIXED: cộng thẳng sau bước nhân.
-8. **Làm tròn đúng 1 lần ở cuối** theo `rounding.mode`.
-9. `fareHash = sha256(configSha256 + fareTotalVnd + tripId)` (nối chuỗi thập phân, UTF-8, không dấu phân cách; ghi rõ trong code và test).
+## Thuật toán (API: `compute(samples, config, contexts, tripId)`)
+1. Lọc GPS thô bằng GpsPolicy (cấu hình từ `config.gps`). Quãng đường dùng **toạ độ thô** của điểm ACCEPTED (toạ độ làm mượt chỉ để hiển thị).
+2. Mỗi đoạn giữa hai điểm ACCEPTED: khoảng cách (mm, equirectangular số nguyên), tốc độ (ưu tiên `speed_mmps` ≥ 0, ngược lại suy ra từ khoảng cách/thời gian).
+3. Chờ: hysteresis theo tốc độ đoạn (vào < `enterThresholdKmh`, ra > `exitThresholdKmh`); đợt chờ < `minWaitSegmentSeconds` bị bỏ; trừ `graceSeconds` TỪNG đợt; tiền chờ = giây tính tiền x `ratePerHourVnd` / 3600. `EXCLUSIVE_FROM_DISTANCE`: đoạn thuộc đợt chờ không cộng vào quãng đường.
+4. `distanceM = Σ mm ~/ 1000`; hiệu chuẩn theo `gps.calibrationApplyOrder` (BEFORE/AFTER_OPENING_KM); `billableM` sau khi trừ `opening.includedMeters`.
+5. Luỹ tiến bậc thang trên `billableM` (`upToMeters` inclusive, null = vô hạn).
+6. Phụ phí theo `surchargePipeline`: MULTIPLIER nhân từng thành phần trong `appliesTo`, sau đó FIXED cộng; điều kiện `TIME_RANGE` đánh giá theo `contexts.tripStartTimeMs` (TRIP_START_TIME).
+7. **Làm tròn đúng 1 lần ở cuối** theo `rounding.unitVnd`/`mode` (ROUND_HALF_UP, FLOOR, CEIL).
+8. `fareHash = sha256(contentSha256 + fareTotal + tripId)`; `contentSha256` = sha256 của config bỏ khoá `integrity`.
 
-### Gợi ý độ chính xác số nguyên (đề xuất, chốt ở Phase 1)
-Để làm tròn đúng 1 lần mà không dùng `double`, giữ trung gian ở thang `S = 60_000` (VND x 60000): distance = `rateVndPerKm * m * 60`, waiting = `rateVndPerMin * sec * 1000`, opening x 60000; phụ phí nhân permille trên thang này; cuối cùng chia S và làm tròn theo `rounding.mode`.
+### Thang số nguyên
+Trung gian ở thang `fareScale = 18000` (VND x 18000): distance = đơn giá/km x m x 18; waiting = đơn giá/giờ x giây x 5; phụ phí nhân permille trên thang này; cuối cùng chia thang và làm tròn. Chi tiết quyết định: `docs/CONTEXT_STATE.md`.
 
 ## Edge cases
 - Chuyến 0 điểm / 1 điểm → distance 0, chỉ tính opening.
@@ -38,7 +35,7 @@ File: `lib/core/taximeter_engine.dart` (PURE). Đầu vào: danh sách điểm A
 - Số rất lớn (chuyến dài >500 km) không tràn (Dart int 64-bit).
 
 ## Fixture mẫu (đã tính tay)
-Opening 10 000 VND gồm 1 000 m; bậc 1 đến 30 000 m billable: 15 000 VND/km; calibration 1000‰; không chờ, không phụ phí. Chuyến 3 000 m → billable 2 000 m → distance 30 000 → total **40 000 VND**.
+Opening 10 000 VND gồm 1 000 m; bậc 1 đến 30 000 m billable: 15 000 VND/km (bậc 2: 12 000); chờ 120 000 VND/giờ, grace 30 s; calibration 1000‰; không phụ phí (xem `test/test_support.dart`). Chuyến 3 000 m → billable 2 000 m → distance 30 000 → total **40 000 VND**.
 
 ## 12 unit test bắt buộc
 - T1: chuyến 0 m → chỉ opening.
@@ -47,12 +44,14 @@ Opening 10 000 VND gồm 1 000 m; bậc 1 đến 30 000 m billable: 15 000 VND/k
 - T4: chuyển bậc đúng biên `upToMeters` (inclusive).
 - T5: calibration BEFORE_OPENING_KM vs AFTER_OPENING_KM.
 - T6: chờ < grace → waiting 0.
-- T7: chờ > grace → tính đúng theo countingPolicy.
+- T7: chờ > grace → tính theo giờ, trừ grace; đoạn chờ không tính vào quãng đường (EXCLUSIVE_FROM_DISTANCE).
 - T8: hysteresis enter/exit không nháy.
 - T9: phụ phí MULTIPLIER một lần trên baseFare (nhiều hệ số).
 - T10: phụ phí FIXED cộng sau bước nhân.
 - T11: làm tròn một lần duy nhất, mọi mode.
 - T12: `fareHash` ổn định; đổi 1 trường → hash đổi; replay hai lần khớp từng byte.
+- Bổ sung: T7b (đợt chờ ngắn bị bỏ), T8b (tốc độ -1 suy ra từ vị trí), T9b (appliesTo), T10b (phụ phí đêm theo TRIP_START_TIME, biên 22:00, nửa đêm, ngày trong tuần), kiểm `fromJson`.
+- E8: `test/golden/replay_golden_test.dart` + `test/fixtures/trip_00*.json` (do chủ dự án cung cấp).
 
 ## Golden replay
 5 file GPX mẫu trong `test/golden/` (+ `.expected.json` chứa distance_m, waiting_sec, fare_total_vnd, fare_hash). Test chạy GpsPolicy → Engine và so khớp byte-for-byte. Thay đổi expected phải có lý do ghi trong CONTEXT_STATE.
