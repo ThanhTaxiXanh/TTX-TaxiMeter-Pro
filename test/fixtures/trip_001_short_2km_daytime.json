@@ -1,0 +1,92 @@
+{
+  "_notes": "Chuyến ngắn 2 km ban ngày, không chờ. 12 khoảng 10s, mỗi khoảng ~167m (60 km/h). Distance ≈ 2000m. Dùng để test đường cơ bản: opening + tier 1.",
+  "fixtureVersion": 1,
+  "tripId": "fixture-trip-001",
+  "description": "Chuyến ngắn 2 km, ban ngày, không chờ",
+  "startedAt": 1795489200000,
+  "startedAtIso": "2026-11-24T10:00:00+07:00",
+  "endedAt": 1795489320000,
+  "config": {
+    "schemaVersion": "2.0",
+    "configId": "test-car4",
+    "configVersion": 1,
+    "effectiveFrom": 1730000000000,
+    "effectiveTo": null,
+    "status": "ACTIVE",
+    "scope": { "vehicleType": "CAR_4", "region": "VN", "operator": "TEST" },
+    "units": { "distance": "meter", "time": "second", "money": "VND", "multiplierBase": 1000 },
+    "opening": { "fareVnd": 12000, "includedMeters": 500 },
+    "distanceTiers": [
+      { "index": 0, "upToMeters": 30000, "pricePerKmVnd": 14500 },
+      { "index": 1, "upToMeters": null, "pricePerKmVnd": 11000 }
+    ],
+    "waiting": {
+      "ratePerHourVnd": 30000,
+      "enterThresholdKmh": 5,
+      "exitThresholdKmh": 7,
+      "graceSeconds": 180,
+      "countingPolicy": "EXCLUSIVE_FROM_DISTANCE",
+      "minWaitSegmentSeconds": 5
+    },
+    "gps": {
+      "maxAccuracyMeters": 20,
+      "maxSpeedKmh": 120,
+      "calibrationFactorPermille": 1000,
+      "calibrationApplyOrder": "BEFORE_OPENING_KM",
+      "anchorDriftGuard": { "enabled": true, "minSpeedMps": 1.5, "anchorRadiusMultiplier": 2.0, "maxAnchorAgeSeconds": 30 }
+    },
+    "rounding": { "unitVnd": 1000, "mode": "ROUND_HALF_UP", "apply": "FINAL_ONLY", "displayModeDuringTrip": "FLOOR" },
+    "surcharges": [
+      {
+        "id": "night",
+        "type": "MULTIPLIER",
+        "valuePermille": 1200,
+        "appliesTo": ["opening", "distance", "waiting"],
+        "condition": {
+          "type": "TIME_RANGE",
+          "timezone": "Asia/Ho_Chi_Minh",
+          "ranges": [{ "from": "22:00", "to": "05:00" }],
+          "daysOfWeek": [1,2,3,4,5,6,7]
+        },
+        "evaluationBasis": "TRIP_START_TIME"
+      }
+    ],
+    "surchargePipeline": { "order": ["night"], "allowStacking": true, "stackingMode": "MULTIPLICATIVE_THEN_ADDITIVE", "maxStackCount": 3 },
+    "validation": { "requireMonotonicTiers": true, "requirePositiveRates": true, "maxTierCount": 12, "requireExitAboveEnter": true },
+    "integrity": { "sha256": null, "signature": null }
+  },
+  "contexts": {
+    "tripStartTimeMs": 1795489200000,
+    "timezone": "Asia/Ho_Chi_Minh",
+    "vehicleType": "CAR_4",
+    "geofenceMatches": []
+  },
+  "samples": [
+    { "ts_ms": 1795489200000, "lat_e7": 107769000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489210000, "lat_e7": 107784000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489220000, "lat_e7": 107799000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489230000, "lat_e7": 107814000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489240000, "lat_e7": 107829000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489250000, "lat_e7": 107844000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489260000, "lat_e7": 107859000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489270000, "lat_e7": 107874000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489280000, "lat_e7": 107889000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489290000, "lat_e7": 107904000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489300000, "lat_e7": 107919000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489310000, "lat_e7": 107934000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" },
+    { "ts_ms": 1795489320000, "lat_e7": 107949000, "lng_e7": 1067009000, "accuracy_mm": 8000, "speed_mmps": -1, "is_mock": false, "source": "FUSED" }
+  ],
+  "expected": {
+    "_formula": "distance ≈ 2000m; billableM = distance − 500 = ~1500; tier1 = 1500 × 14.5 = 21750; base = 12000 + 21750 = 33750; không surcharge (10:00 < 22:00); round → 34000",
+    "distance_m_approx": 2000,
+    "distance_tolerance_m": 10,
+    "waiting_sec": 0,
+    "fare_opening_vnd": 12000,
+    "fare_distance_vnd_approx": 21750,
+    "fare_distance_vnd_tolerance": 500,
+    "fare_waiting_vnd": 0,
+    "fare_surcharge_vnd": 0,
+    "fare_total_vnd": 34000,
+    "currency": "VND"
+  }
+}
