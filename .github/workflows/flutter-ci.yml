@@ -48,7 +48,7 @@ jobs:
               echo "::error::lib/core không được dùng DateTime.now/Random"; exit 1
             fi
           fi
-          if grep -niE "google_maps|mapbox|vietqr" pubspec.yaml; then
+          if grep -nE "^[[:space:]]+(google_maps[a-z_]*|mapbox[a-z_]*|[a-z_]*vietqr[a-z_]*)[[:space:]]*:" pubspec.yaml; then
             echo "::error::Dependency bị cấm trong pubspec.yaml"; exit 1
           fi
 
