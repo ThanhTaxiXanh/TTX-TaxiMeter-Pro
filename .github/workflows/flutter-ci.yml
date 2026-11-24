@@ -52,6 +52,10 @@ jobs:
             echo "::error::Dependency bị cấm trong pubspec.yaml"; exit 1
           fi
 
+      - name: Cai libsqlite3 (test Drift tren runner)
+        if: steps.detect.outputs.has_flutter == 'true'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsqlite3-dev
+
       - name: flutter pub get
         if: steps.detect.outputs.has_flutter == 'true'
         run: flutter pub get
