@@ -37,8 +37,9 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - Công thức khoảng cách số nguyên (haversine nguyên vs equirectangular).
 - Thang trung gian làm tròn 1 lần (đề xuất S = 60 000, xem skill taximeter-engine).
 - Định dạng chính xác `fareHash` và `state_json`.
-- "Mục 11 — 10 điều cấm" không có trong master prompt gốc; 10 điều trong copilot-instructions.md được tổng hợp, chủ dự án có thể chỉnh.
+- Danh sách điều cấm chính thức do chủ dự án cung cấp (9 điều) đã ghi vào copilot-instructions.md; điều thứ 10 chờ bổ sung. Test "E8" chưa rõ nghĩa (engine có T1–T12, GPS có G1–G8): cần chủ dự án làm rõ; hiện hiểu là test replay (G8 + golden replay).
 - Tài nguyên `traffic_signs.geojson` đang nằm trong Project TTX TaxiMeter Pro (chưa đưa vào repo).
 
 ## Nhật ký
+- 2026-11-24: Thay danh sách điều cấm bằng bản chính thức của chủ dự án.
 - 2026-11-24: Phase 0 — tạo `.github/copilot-instructions.md`, 2 agent, 4 SKILL.md, `flutter-ci.yml`, `docs/CONTEXT_STATE.md`.

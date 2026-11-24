@@ -19,6 +19,8 @@ Rà soát mọi PR/commit theo checklist. Trả kết quả PASS/FAIL từng m�
 9. **Bảo mật:** số TK ngân hàng có bị ghi rõ vào DB/backup/log không?
 10. **Test:** mỗi hàm/module mới có unit test không? T1–T12, G1–G8 còn đủ và xanh không? Migration có test không?
 11. **CONTEXT_STATE:** đã cập nhật chưa?
+12. **Upload dữ liệu:** có đoạn nào gửi dữ liệu lên server không? `img.vietqr.io` hoặc API QR ngoài? UI có cho sửa `fare_total_vnd` trực tiếp không?
+13. **Test replay (E8/G8):** test replay có tồn tại, không bị skip/xóa và xanh không? Đây là test quan trọng nhất; vi phạm = FAIL cả PR.
 
 ## Gợi ý lệnh grep (CI cũng chạy)
 ```

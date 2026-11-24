@@ -29,18 +29,20 @@
 7. **VietQR offline 100%.** Tự sinh EMVCo TLV + CRC16, không gọi API ngoài, không dùng package vietqr.
 8. **Hiển thị tốc độ chuẩn Việt Nam.** Biển giới hạn tốc độ viền đỏ nền trắng chữ đen (QCVN), tốc độ mặc định theo loại đường, chạm biển trên map để override nhanh.
 
-## 10 điều cấm
-(Master prompt nhắc "Mục 11" nhưng không có nội dung; 10 điều dưới đây được tổng hợp từ các ràng buộc trong prompt. Chủ dự án có thể chỉnh.)
-1. CẤM `double`/`num` thập phân cho tiền, khoảng cách, thời gian, tọa độ tính cước.
-2. CẤM `DateTime.now()`, `Random()`, I/O, đọc biến toàn cục trong `TaximeterEngine`/`GpsPolicy`.
-3. CẤM `UPDATE` trực tiếp `fare_*_vnd` của `trip_record`.
-4. CẤM `DELETE FROM trip_record` khi chưa insert `trip_tombstone` cùng transaction.
-5. CẤM resolve lại biểu giá giữa chuyến hoặc sửa `tariff_config` đã ACTIVE (tạo version mới).
-6. CẤM gọi mạng cho tính cước, QR, cảnh báo giao thông; CẤM Google Maps API, Mapbox, backend, dịch vụ trả phí.
-7. CẤM dùng package VietQR ngoài; phải tự build TLV + CRC16.
-8. CẤM lưu số tài khoản ngân hàng dạng rõ trong DB/backup (mã hóa bằng `flutter_secure_storage`, không export trong backup).
-9. CẤM xóa/sửa dòng `trip_tombstone` ngoài cột đối soát (`reconciled*`, `restored_at`); CẤM đổi schema mà không có migration + test.
-10. CẤM đánh dấu task xong khi thiếu unit test hoặc CI chưa xanh; CẤM sang Phase mới khi cổng kiểm soát chưa đạt.
+## Điều cấm (do chủ dự án quy định — nguồn chính thức)
+1. ❌ Không dùng Google Maps API, Mapbox, hay bất kỳ tile server trả phí.
+2. ❌ Không gọi `img.vietqr.io` hay API ngoài khi sinh QR.
+3. ❌ Không dùng `double` cho tiền/khoảng cách/thời gian.
+4. ❌ Không cho sửa trực tiếp `fare_total_vnd` từ UI (đổi tiền qua `trip_adjustment`).
+5. ❌ Không `DELETE FROM trip_record` khi chưa insert tombstone trong cùng transaction.
+6. ❌ Không resolve lại config giữa chuyến đang chạy.
+7. ❌ Không upload bất kỳ dữ liệu nào lên server.
+8. ❌ Không dùng package vietqr có sẵn — tự implement.
+9. ❌ Không bỏ qua test replay (E8/G8) — đây là test quan trọng nhất.
+
+(Chủ dự án nói "10 điều" nhưng liệt kê 9. Điều thứ 10 đang chờ chủ dự án bổ sung.)
+
+Quy tắc phụ rút ra từ prompt gốc (đề xuất, không thay thế danh sách trên): `lib/core` không dùng `DateTime.now()`/`Random()`/I/O; không lưu số tài khoản ngân hàng dạng rõ trong DB/backup; đổi schema phải có migration + test; không sang Phase mới khi CI chưa xanh.
 
 ## Tech stack
 Android only (minSdk 24, targetSdk 34, Kotlin DSL, coreLibraryDesugaring). Dart SDK >=3.5.0 <4.0.0, Flutter >=3.24.0. State: `flutter_riverpod`. DB: Drift + sqlite3_flutter_libs. Map: `maplibre_gl` + PMTiles qua `LocalHttpTileServer` tự viết. Danh sách dependency đầy đủ nằm trong master prompt Mục 2 và phải được copy nguyên vào `pubspec.yaml` ở Phase 1.
