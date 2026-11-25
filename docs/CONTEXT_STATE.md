@@ -3,18 +3,20 @@
 > AI: đọc file này sau `.github/copilot-instructions.md`. Cập nhật sau MỖI task.
 
 ## Trạng thái hiện tại
-- **Phase hiện tại:** Phase 1 — HOÀN THÀNH (CI xanh: `flutter analyze` sạch, 59 test pass, build được 3 APK split-per-abi, artifact `ttx-taximeter-apks`).
-  - 1a: lõi thuần Dart (`lib/core`, `lib/domain/models`), test T1–T12, G1–G8, E8, golden replay.
-  - 1b: `android/` (Kotlin DSL, minSdk 24, targetSdk 34, compileSdk 35, coreLibraryDesugaring), `.gitignore`.
-  - 1c: Drift schema 14 bảng (`lib/data/db/`), index, trigger sổ cái bất biến, `schemaVersion = 1`, test trong `test/data/app_database_test.dart`.
-- **Next:** Phase 2 — Android Foreground Service (Kotlin + flutter_foreground_task), TripActiveController + `active_trip_snapshot` (3 s, định dạng `state_json`), DashboardScreen. Cần quyền location/foreground service/notification trong AndroidManifest.
+- **Phase hiện tại:** Phase 2 — HOÀN THÀNH (CI xanh: analyze sạch, test pass, build APK).
+  - Lõi: `lib/domain/trip/active_trip_session.dart` (thuần; cước luôn = `TaximeterEngine.compute` trên toàn bộ mẫu GPS thô; hiển thị trong chuyến dùng `rounding.displayMode`=floor, chốt dùng mode của config).
+  - Lưu: `lib/data/trip/trip_store.dart` (`DriftTripStore`, SQL thô): mẫu GPS ghi dần vào `raw_gps_points` (decision='RAW'), `active_trip_snapshot.state_json` = {v, contexts, sampleCount}; khôi phục = đọc lại đúng (config_id, version) và kiểm sha256 (KHÔNG resolve lại config); `finishTrip` ghi `trip_record` + `raw_trace_meta` + xoá snapshot trong 1 transaction.
+  - Biểu giá mặc định MẪU (`lib/domain/tariff/default_tariff.dart`: mở cửa 12.000/0,8 km, 15.000→12.000 đ/km, chờ 90.000 đ/giờ, làm tròn 1.000) tự tạo lần đầu — CHỦ XE PHẢI THAY bằng biểu giá thật (Settings, Phase 6).
+  - UI/nền tảng: `TripController` (Riverpod Notifier; flush 3 s, tick 1 s, restoreOnLaunch), `DashboardScreen` (tiếng Việt, Material 3 tối), `GeolocatorLocationService` (foreground notification qua geolocator), wakelock, quyền Android trong AndroidManifest.
+  - Chưa làm (cố ý): mã hoá `raw_gps_points.decision` theo từng mẫu (engine không trả quyết định từng mẫu), chọn loại xe/vehicleType (đang CAR_4), icon launcher.
+- **Next:** Phase 3 — VietQR tự viết (EMVCo TLV + CRC16, test vector trong skill vietqr-offline), BankRepository, QrPaymentDialog, luồng thanh toán (ghi `trip_payment`).
 
 ## Bảng tiến độ 7 Phase
 | Phase | Nội dung | Trạng thái |
 |---|---|---|
 | 0 | GitHub Brain & CI | Xong (commit) |
 | 1 | Flutter, Drift, TariffConfigV2, Engine (12 test), GpsPolicy (8 test) | Xong (CI xanh) |
-| 2 | Foreground Service, TripActiveController, snapshot 3s, DashboardScreen | Chưa bắt đầu |
+| 2 | Foreground Service, TripActiveController, snapshot 3s, DashboardScreen | Xong (CI xanh) |
 | 3 | VietQR, BankRepository, QrPaymentDialog, luồng thanh toán | Chưa bắt đầu |
 | 4 | TripList/Detail, Tombstone, Trash, Revenue, Reconciliation | Chưa bắt đầu |
 | 5 | MapScreen, LocalHttpTileServer, Traffic, biển QCVN, ReportReview | Chưa bắt đầu |
@@ -70,6 +72,7 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - Ý nghĩa test "E8" đã hiểu = replay fixture (`replay_golden_test.dart`); nếu khác, báo lại.
 
 ## Nhật ký
+- 2026-11-26: Phase 2 xong (session, TripStore + khôi phục sau crash, TripController, Dashboard, quyền GPS nền); CI xanh.
 - 2026-11-25: Phase 1b (android/, APK build trên CI) và 1c (Drift schema + trigger sổ cái + test) xong; CI xanh, 59 test → Phase 1 hoàn thành, sẵn sàng Phase 2.
 - 2026-11-24: Engine theo schema config 2.0 + 5 fixture E8 của chủ dự án; đổi package thành `ttx`; ghi lại expected 5 chuyến thật; CI xanh.
 - 2026-11-24: Thêm 5 GPX golden replay + expected; viết lại test G1–G8 theo đặc tả chủ dự án; chủ dự án rút gọn còn 9 điều cấm (commit c949a12).
