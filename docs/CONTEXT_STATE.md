@@ -3,15 +3,17 @@
 > AI: đọc file này sau `.github/copilot-instructions.md`. Cập nhật sau MỖI task.
 
 ## Trạng thái hiện tại
-- **Phase hiện tại:** Phase 1 — đang làm. **1a XONG**: package `ttx`; `lib/domain/models/` (GpsSample, TariffConfigV2 schema 2.0 + `fromJson`, Surcharge/SurchargeContexts); `lib/core/` (geo, GpsPolicy, TaximeterEngine); test T1–T12, G1–G8, E8 (5 fixture `test/fixtures/trip_00*.json` của chủ dự án, `test/golden/replay_golden_test.dart`), golden replay 5 chuyến GPX thật (`test/real_trips_replay_test.dart`).
-- **Next (1b):** thư mục `android/` (Kotlin DSL, minSdk 24, targetSdk 34, coreLibraryDesugaring) để build APK; **(1c):** Drift schema + migrations (Mục 4 master prompt) + test migration.
-- CI bỏ qua build APK khi chưa có `android/`.
+- **Phase hiện tại:** Phase 1 — HOÀN THÀNH (CI xanh: `flutter analyze` sạch, 59 test pass, build được 3 APK split-per-abi, artifact `ttx-taximeter-apks`).
+  - 1a: lõi thuần Dart (`lib/core`, `lib/domain/models`), test T1–T12, G1–G8, E8, golden replay.
+  - 1b: `android/` (Kotlin DSL, minSdk 24, targetSdk 34, compileSdk 35, coreLibraryDesugaring), `.gitignore`.
+  - 1c: Drift schema 14 bảng (`lib/data/db/`), index, trigger sổ cái bất biến, `schemaVersion = 1`, test trong `test/data/app_database_test.dart`.
+- **Next:** Phase 2 — Android Foreground Service (Kotlin + flutter_foreground_task), TripActiveController + `active_trip_snapshot` (3 s, định dạng `state_json`), DashboardScreen. Cần quyền location/foreground service/notification trong AndroidManifest.
 
 ## Bảng tiến độ 7 Phase
 | Phase | Nội dung | Trạng thái |
 |---|---|---|
 | 0 | GitHub Brain & CI | Xong (commit) |
-| 1 | Flutter, Drift, TariffConfigV2, Engine (12 test), GpsPolicy (8 test) | Đang làm: 1a xong (core + test), còn 1b android/, 1c Drift |
+| 1 | Flutter, Drift, TariffConfigV2, Engine (12 test), GpsPolicy (8 test) | Xong (CI xanh) |
 | 2 | Foreground Service, TripActiveController, snapshot 3s, DashboardScreen | Chưa bắt đầu |
 | 3 | VietQR, BankRepository, QrPaymentDialog, luồng thanh toán | Chưa bắt đầu |
 | 4 | TripList/Detail, Tombstone, Trash, Revenue, Reconciliation | Chưa bắt đầu |
@@ -52,10 +54,21 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - **E8 (fixture):** 5 file `test/fixtures/trip_00*.json` (fixture 2–5 kế thừa config của trip_001 qua `configInheritFrom`); mỗi fixture kiểm kết quả mong đợi + replay hai lần khớp từng trường. Khoảng cách engine lệch ~0,1% so với con số "tròn" trong fixture (111 195 vs ~111 320 m/độ), nằm trong tolerance; `fare_total_vnd` khớp chính xác.
 - **Chuyến thật:** 5 GPX → CSV (`tool/gpx_to_csv.py`, `test/golden/*.csv`), accuracy cố định 5 m (GPX không có), biểu giá của trip_001; so khớp byte-for-byte `*.expected.json`. Khoảng cách engine = 97,3–99,6% haversine độc lập (đã bỏ các đoạn chờ; không bị loại điểm nào trừ 1 điểm ở chuyến Trần Nguyên Hãn). Expected được ghi lại 2026-11-24 sau khi đổi engine (toạ độ thô, bỏ đoạn chờ, thang 18000).
 
+## Quyết định kỹ thuật Phase 1b/1c
+- **Android:** AGP 8.3.2, Gradle 8.6, Kotlin 1.9.24, JDK 17, `compileSdk 35` (plugin yêu cầu; `targetSdk 34`), applicationId/namespace `vn.ttx.taximeter`. Release tạm ký bằng khoá debug để cài trực tiếp từ CI (TODO Phase 7: khoá phát hành riêng, không commit keystore). Chưa có icon launcher (dùng mặc định).
+- **Quyền INTERNET** có trong manifest CHỈ để `LocalHttpTileServer` nghe/kết nối loopback; `network_security_config` cho phép HTTP thuần chỉ tới `127.0.0.1`/`localhost`, mọi host khác chỉ HTTPS. Không có đoạn code nào gọi mạng ngoài.
+- **`dependency_overrides: geolocator_android: 4.6.1`:** bản 4.6.2 hỏng build trên Flutter 3.24 (`Could not get unknown property 'flutter'`). Gỡ override khi nâng Flutter.
+- **Drift:** bảng khai báo bằng Dart DSL, mã sinh (`*.g.dart`) KHÔNG commit (CI chạy build_runner). Index có `DESC` và trigger tạo bằng SQL thô trong `onCreate` (`lib/data/db/schema_extras.dart`). Trigger: cấm UPDATE trường cước/config của `trip_record`; cấm DELETE `trip_record` khi chưa có `trip_tombstone` cùng `trip_id` (insert tombstone trong CÙNG transaction); `trip_adjustment` và `trip_edit_log` chỉ thêm dòng (xóa adjustment chỉ khi đã có tombstone); `trip_tombstone` chỉ sửa được ghi chú/`reconciled*`/`restored_at`. CHECK: `id = 1` (snapshot, bank account), `status`/`method`/`state`/`deleted_reason`/`kind` theo tập giá trị trong spec.
+- **Migration:** `appSchemaVersion = 1`; nhánh `onUpgrade` để trống đến khi có v2 (khi đó thêm nhánh `if (from < 2)` + test migration; nhớ tạo lại trigger/index nếu đổi). DB thật mở bằng `openAppDatabase()` (WAL, `ttx_taximeter.db` trong thư mục documents).
+- CI: cài `libsqlite3-dev` để chạy test Drift trên runner; chỉ build APK khi có `android/`.
+
 ## Việc còn chờ chủ dự án
+- **Số tài khoản ngân hàng dạng rõ:** spec Mục 4 có cột `trip_payment.bank_account` và `trip_tombstone.bank_account`, nên số TK sẽ nằm trong `database.db` và vì vậy trong file backup, trái với ý "backup không export số TK". Cần quyết: bỏ/che số TK ở hai bảng này (vd chỉ lưu 4 số cuối) hay chấp nhận.
 - Tài nguyên `traffic_signs.geojson` đang rỗng/chưa đưa vào repo (dùng ở Phase 5).
+- Ý nghĩa test "E8" đã hiểu = replay fixture (`replay_golden_test.dart`); nếu khác, báo lại.
 
 ## Nhật ký
+- 2026-11-25: Phase 1b (android/, APK build trên CI) và 1c (Drift schema + trigger sổ cái + test) xong; CI xanh, 59 test → Phase 1 hoàn thành, sẵn sàng Phase 2.
 - 2026-11-24: Engine theo schema config 2.0 + 5 fixture E8 của chủ dự án; đổi package thành `ttx`; ghi lại expected 5 chuyến thật; CI xanh.
 - 2026-11-24: Thêm 5 GPX golden replay + expected; viết lại test G1–G8 theo đặc tả chủ dự án; chủ dự án rút gọn còn 9 điều cấm (commit c949a12).
 - 2026-11-24: Phase 1a — pubspec, lib/core (geo, tariff_config, gps_policy, taximeter_engine), 23 test; CI xanh; sửa audit CI chỉ khớp khóa dependency thật.
