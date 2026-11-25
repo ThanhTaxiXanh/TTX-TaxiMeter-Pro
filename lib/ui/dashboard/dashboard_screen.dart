@@ -17,8 +17,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     // Khoi phuc chuyen dang do sau khi app bi tat.
-    Future<void>.microtask(
-        () => ref.read(tripControllerProvider.notifier).restoreOnLaunch());
+    Future<void>.microtask(() async {
+      final TripController c = ref.read(tripControllerProvider.notifier);
+      await c.requestPermissionsOnLaunch();
+      await c.restoreOnLaunch();
+    });
   }
 
   Future<void> _confirmStop() async {

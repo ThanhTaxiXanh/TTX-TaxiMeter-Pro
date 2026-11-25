@@ -21,6 +21,9 @@ class FakeLocation implements LocationService {
   Future<LocationPermissionState> ensurePermission() async => permission;
 
   @override
+  Future<void> requestNotificationPermission() async {}
+
+  @override
   Stream<GpsSample> start() => ctl.stream;
 }
 
@@ -86,6 +89,13 @@ void main() {
     final rows = await db.customSelect('SELECT fare_total_vnd FROM trip_record').get();
     expect(rows, hasLength(1));
     expect(rows.first.read<int>('fare_total_vnd'), end.finished!.fareTotal);
+  });
+
+  test('xin quyen ngay khi mo app; bi chan -> bao loi', () async {
+    loc.permission = LocationPermissionState.denied;
+    final ProviderContainer c = make();
+    await c.read(tripControllerProvider.notifier).requestPermissionsOnLaunch();
+    expect(c.read(tripControllerProvider).error, isNotNull);
   });
 
   test('thieu quyen vi tri -> bao loi, khong tao chuyen', () async {

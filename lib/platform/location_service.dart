@@ -10,12 +10,22 @@ enum LocationPermissionState { granted, denied, deniedForever, serviceOff }
 abstract class LocationService {
   Future<LocationPermissionState> ensurePermission();
 
+  /// Android 13+: xin quyen hien thi thong bao (thong bao cua dich vu GPS).
+  Future<void> requestNotificationPermission();
+
   /// Bat dau nhan GPS (Foreground Service khi chay ngam).
   Stream<GpsSample> start();
 }
 
 /// geolocator + thong bao Foreground Service (Android).
 class GeolocatorLocationService implements LocationService {
+  @override
+  Future<void> requestNotificationPermission() async {
+    try {
+      await Permission.notification.request();
+    } catch (_) {}
+  }
+
   @override
   Future<LocationPermissionState> ensurePermission() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -29,10 +39,6 @@ class GeolocatorLocationService implements LocationService {
       return LocationPermissionState.deniedForever;
     }
     if (p == LocationPermission.denied) return LocationPermissionState.denied;
-    // Android 13+: thong bao cua dich vu nen can quyen thong bao (khong bat buoc).
-    try {
-      await Permission.notification.request();
-    } catch (_) {}
     return LocationPermissionState.granted;
   }
 
@@ -46,6 +52,8 @@ class GeolocatorLocationService implements LocationService {
         notificationTitle: 'TTX TaxiMeter Pro',
         notificationText: 'Đang ghi hành trình',
         notificationChannelName: 'Hành trình',
+        // Bat buoc co icon nho hop le, neu khong Android se giet app khi bat dich vu.
+        notificationIcon: AndroidResource(name: 'ic_notification', defType: 'drawable'),
         enableWakeLock: true,
       ),
     );

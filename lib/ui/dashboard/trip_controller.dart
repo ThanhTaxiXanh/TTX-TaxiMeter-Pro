@@ -101,12 +101,33 @@ class TripController extends Notifier<TripUiState> {
   /// Goi khi mo app: neu co chuyen dang do (app bi tat) thi chay tiep.
   Future<void> restoreOnLaunch() async {
     if (_session != null) return;
-    final RestoredTrip? r = await _store.loadActive();
-    if (r == null) return;
-    _session = r.session;
-    _flushedSeq = r.session.sampleCount;
-    state = state.copyWith(restored: true);
-    await _beginRunning(requirePermission: true);
+    try {
+      final RestoredTrip? r = await _store.loadActive();
+      if (r == null) return;
+      _session = r.session;
+      _flushedSeq = r.session.sampleCount;
+      state = state.copyWith(restored: true);
+      await _beginRunning(requirePermission: true);
+    } catch (e) {
+      _cancelAll();
+      _session = null;
+      state = state.copyWith(error: 'Không khôi phục được chuyến đang dở: $e');
+    }
+  }
+
+  /// Xin quyen vi tri + thong bao ngay khi mo app (khong cho den luc bam Bat dau).
+  Future<void> requestPermissionsOnLaunch() async {
+    final LocationService loc = ref.read(locationServiceProvider);
+    try {
+      final LocationPermissionState p = await loc.ensurePermission();
+      if (p == LocationPermissionState.granted) {
+        await loc.requestNotificationPermission();
+      } else {
+        state = state.copyWith(error: _permissionMessage(p));
+      }
+    } catch (e) {
+      state = state.copyWith(error: 'Không xin được quyền: $e');
+    }
   }
 
   Future<void> startTrip() async {
@@ -145,6 +166,7 @@ class TripController extends Notifier<TripUiState> {
         return;
       }
     }
+    await loc.requestNotificationPermission();
     await ref.read(screenAwakeProvider).enable();
     _lastSampleArrivalMs = _now();
     _sub = loc.start().listen(_onSample, onError: (Object e) {
