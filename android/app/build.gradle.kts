@@ -7,7 +7,9 @@ plugins {
 
 android {
     namespace = "vn.ttx.taximeter"
-    compileSdk = 34
+    // Plugin (flutter_plugin_android_lifecycle...) yeu cau compileSdk >= 35;
+    // targetSdk van la 34.
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -59,5 +59,10 @@ dev_dependencies:
   build_runner: ^2.4.0
   mocktail: ^1.0.0
 
+# geolocator_android 4.6.2 hong build tren Flutter 3.24 (build.gradle cua plugin
+# dung thuoc tinh `flutter` khong ton tai o thu vien). Ghim 4.6.1.
+dependency_overrides:
+  geolocator_android: 4.6.1
+
 flutter:
   uses-material-design: true
