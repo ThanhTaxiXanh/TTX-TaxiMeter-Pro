@@ -45,6 +45,13 @@ class SurchargeContexts {
   final String timezone;
   final String vehicleType;
   final List<String> geofenceMatches;
+
+  Map<String, Object> toJson() => <String, Object>{
+        'tripStartTimeMs': tripStartTimeMs,
+        'timezone': timezone,
+        'vehicleType': vehicleType,
+        'geofenceMatches': geofenceMatches,
+      };
 }
 
 class TimeOfDayRange {

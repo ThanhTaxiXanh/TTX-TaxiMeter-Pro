@@ -74,10 +74,17 @@ class GpsRules {
 }
 
 class RoundingPolicy {
-  const RoundingPolicy({required this.unitVnd, required this.mode});
+  const RoundingPolicy({
+    required this.unitVnd,
+    required this.mode,
+    this.displayMode = RoundingMode.floor,
+  });
 
   final int unitVnd;
   final RoundingMode mode;
+
+  /// Che do lam tron de HIEN THI cuoc dang chay (displayModeDuringTrip).
+  final RoundingMode displayMode;
 }
 
 class TariffConfigV2 {
@@ -190,8 +197,13 @@ class TariffConfigV2 {
     }
     final int unit = _int(rm, 'unitVnd');
     if (unit < 1) throw const FormatException('rounding.unitVnd phai >= 1');
-    final RoundingPolicy rounding =
-        RoundingPolicy(unitVnd: unit, mode: _roundingMode(_str(rm, 'mode')));
+    final Object? displayRaw = rm['displayModeDuringTrip'];
+    final RoundingPolicy rounding = RoundingPolicy(
+      unitVnd: unit,
+      mode: _roundingMode(_str(rm, 'mode')),
+      displayMode:
+          displayRaw is String ? _roundingMode(displayRaw) : RoundingMode.floor,
+    );
 
     // --- phu phi ---
     final List<Surcharge> surcharges =

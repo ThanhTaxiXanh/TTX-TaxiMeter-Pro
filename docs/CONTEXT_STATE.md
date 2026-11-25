@@ -62,8 +62,10 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - **Migration:** `appSchemaVersion = 1`; nhánh `onUpgrade` để trống đến khi có v2 (khi đó thêm nhánh `if (from < 2)` + test migration; nhớ tạo lại trigger/index nếu đổi). DB thật mở bằng `openAppDatabase()` (WAL, `ttx_taximeter.db` trong thư mục documents).
 - CI: cài `libsqlite3-dev` để chạy test Drift trên runner; chỉ build APK khi có `android/`.
 
+## Quyết định của chủ dự án (2026-11-25)
+- **Giữ nguyên spec Mục 4** cho `bank_account` (`trip_payment`, `trip_tombstone`): số tài khoản nằm trong `database.db` và vì vậy trong file backup, để restore xong không phải nhập lại gì. Lưu ý kỹ thuật cho Phase 3/6: `driver_bank_account.account_number_encrypted` mã hoá bằng khoá của thiết bị (flutter_secure_storage) nên restore sang máy khác sẽ không giải mã được; khi làm BankRepository/Backup cần chọn cách để số TK hiện tại vẫn restore được (vd lưu thêm bản đọc được trong backup, hoặc không mã hoá cột này).
+
 ## Việc còn chờ chủ dự án
-- **Số tài khoản ngân hàng dạng rõ:** spec Mục 4 có cột `trip_payment.bank_account` và `trip_tombstone.bank_account`, nên số TK sẽ nằm trong `database.db` và vì vậy trong file backup, trái với ý "backup không export số TK". Cần quyết: bỏ/che số TK ở hai bảng này (vd chỉ lưu 4 số cuối) hay chấp nhận.
 - Tài nguyên `traffic_signs.geojson` đang rỗng/chưa đưa vào repo (dùng ở Phase 5).
 - Ý nghĩa test "E8" đã hiểu = replay fixture (`replay_golden_test.dart`); nếu khác, báo lại.
 

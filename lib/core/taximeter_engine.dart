@@ -33,6 +33,8 @@ class FareResult {
     required this.fareSurcharge,
     required this.fareTotal,
     required this.fareHash,
+    this.waitingNow = false,
+    this.lastSpeedMmps = -1,
   });
 
   final int acceptedCount;
@@ -62,6 +64,13 @@ class FareResult {
   /// So tien khach tra (da lam tron 1 lan). Day la so co tham quyen.
   final int fareTotal;
   final String fareHash;
+
+  /// Doan cuoi dang thuoc mot dot cho da du minWaitSegmentSeconds (chi de
+  /// hien thi; khong nam trong toJson/so sanh).
+  final bool waitingNow;
+
+  /// Toc do (mm/s) cua doan cuoi; -1 neu chua co doan nao.
+  final int lastSpeedMmps;
 
   Map<String, Object> toJson() => <String, Object>{
         'accepted': acceptedCount,
@@ -113,6 +122,7 @@ class TaximeterEngine {
     required TariffConfigV2 config,
     required SurchargeContexts contexts,
     String tripId = '',
+    RoundingMode? roundingModeOverride,
   }) {
     // 1. Loc GPS.
     final GpsPolicyConfig policy = GpsPolicyConfig.fromRules(config.gps);
@@ -236,7 +246,11 @@ class TaximeterEngine {
     final int afterScaled = o + d + w + fixedScaled;
 
     // 7. Lam tron dung 1 lan.
-    final int total = _roundScaled(afterScaled, config.rounding);
+    final int total = _roundScaled(
+      afterScaled,
+      config.rounding.unitVnd,
+      roundingModeOverride ?? config.rounding.mode,
+    );
 
     return FareResult(
       acceptedCount: acc.length,
@@ -258,6 +272,8 @@ class TaximeterEngine {
         fareTotalVnd: total,
         tripId: tripId,
       ),
+      waitingNow: segCount > 0 && excluded[segCount - 1],
+      lastSpeedMmps: segCount > 0 ? speed[segCount - 1] : -1,
     );
   }
 
@@ -305,10 +321,10 @@ class TaximeterEngine {
     return matched;
   }
 
-  static int _roundScaled(int scaled, RoundingPolicy r) {
-    final int unitScaled = r.unitVnd * fareScale;
+  static int _roundScaled(int scaled, int unitVnd, RoundingMode mode) {
+    final int unitScaled = unitVnd * fareScale;
     final int units;
-    switch (r.mode) {
+    switch (mode) {
       case RoundingMode.halfUp:
         units = (scaled + unitScaled ~/ 2) ~/ unitScaled;
       case RoundingMode.ceil:
@@ -316,6 +332,6 @@ class TaximeterEngine {
       case RoundingMode.floor:
         units = scaled ~/ unitScaled;
     }
-    return units * r.unitVnd;
+    return units * unitVnd;
   }
 }
