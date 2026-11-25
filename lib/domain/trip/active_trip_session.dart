@@ -1,6 +1,5 @@
 import '../../core/taximeter_engine.dart';
 import '../models/gps_sample.dart';
-import '../models/surcharge.dart';
 import '../models/tariff_config_v2.dart';
 
 /// Mot chuyen dang chay. THUAN: khong doc dong ho, khong IO. Config duoc chot

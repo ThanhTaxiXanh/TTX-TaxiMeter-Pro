@@ -5,7 +5,6 @@ import 'package:drift/drift.dart';
 
 import '../../core/taximeter_engine.dart';
 import '../../domain/models/gps_sample.dart';
-import '../../domain/models/surcharge.dart';
 import '../../domain/models/tariff_config_v2.dart';
 import '../../domain/tariff/default_tariff.dart';
 import '../../domain/trip/active_trip_session.dart';

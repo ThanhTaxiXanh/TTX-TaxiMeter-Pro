@@ -6,7 +6,6 @@ import '../../app/providers.dart';
 import '../../core/taximeter_engine.dart';
 import '../../data/trip/trip_store.dart';
 import '../../domain/models/gps_sample.dart';
-import '../../domain/models/surcharge.dart';
 import '../../domain/models/tariff_config_v2.dart';
 import '../../domain/trip/active_trip_session.dart';
 import '../../platform/location_service.dart';
