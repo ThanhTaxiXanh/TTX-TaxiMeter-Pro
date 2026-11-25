@@ -1,10 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'app/providers.dart';
+import 'data/db/open_database.dart';
+import 'ui/dashboard/dashboard_screen.dart';
 
 void main() {
-  runApp(const TtxApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(ProviderScope(
+    overrides: <Override>[
+      databaseProvider.overrideWith((Ref ref) {
+        final db = openAppDatabase();
+        ref.onDispose(db.close);
+        return db;
+      }),
+    ],
+    child: const TtxApp(),
+  ));
 }
 
-/// Khung ung dung tam thoi (Phase 1). UI that su o Phase 2 tro di.
 class TtxApp extends StatelessWidget {
   const TtxApp({super.key});
 
@@ -12,11 +26,15 @@ class TtxApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TTX TaxiMeter Pro',
+      debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark,
-      darkTheme: ThemeData.dark(useMaterial3: true),
-      home: const Scaffold(
-        body: Center(child: Text('TTX TaxiMeter Pro')),
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.green),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        colorSchemeSeed: Colors.green,
       ),
+      home: const DashboardScreen(),
     );
   }
 }
