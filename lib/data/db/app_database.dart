@@ -1,0 +1,52 @@
+import 'package:drift/drift.dart';
+
+import 'schema_extras.dart';
+import 'tables.dart';
+
+part 'app_database.g.dart';
+
+/// Phien ban schema hien tai. Doi schema -> tang so nay, them nhanh
+/// `onUpgrade` tuong ung va test migration.
+const int appSchemaVersion = 1;
+
+@DriftDatabase(
+  tables: <Type>[
+    ActiveTripSnapshot,
+    TariffConfig,
+    DriverBankAccount,
+    BankDirectory,
+    BankDirectoryMeta,
+    TripRecord,
+    RawGpsPoints,
+    RawTraceMeta,
+    TripPayment,
+    TripAdjustment,
+    TripEditLog,
+    TripTombstone,
+    TrafficOverride,
+    TrafficReport,
+  ],
+)
+class AppDatabase extends _$AppDatabase {
+  AppDatabase(super.e);
+
+  @override
+  int get schemaVersion => appSchemaVersion;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (Migrator m) async {
+          await m.createAll();
+          for (final String sql in indexStatements) {
+            await customStatement(sql);
+          }
+          for (final String sql in ledgerTriggerStatements) {
+            await customStatement(sql);
+          }
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          // Chua co phien ban cu hon v1. Khi len v2: them nhanh `if (from < 2)`
+          // tai day (va tao lai trigger/index neu doi), kem test migration.
+        },
+      );
+}
