@@ -82,7 +82,7 @@ Future<Uint8List?> renderMapIcon(String name) async {
     case 'sign_tunnel':
       return _render((Canvas c, double s) {
         _square(c, s, const Color(0xFF1565C0), Colors.white);
-        _glyph(c, s, Icons.tunnel, Colors.white, 52);
+        _glyph(c, s, Icons.shortcut, Colors.white, 52);
       });
     case 'sign_restArea':
       return _render((Canvas c, double s) {
