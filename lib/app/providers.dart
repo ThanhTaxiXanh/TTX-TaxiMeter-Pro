@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/bank/bank_repository.dart';
 import '../data/db/app_database.dart';
 import '../data/payment/payment_repository.dart';
+import '../data/trip/tombstone_repository.dart';
+import '../data/trip/trip_repository.dart';
 import '../data/trip/trip_store.dart';
 import '../platform/brightness_control.dart';
 import '../platform/location_service.dart';
@@ -35,3 +37,9 @@ final Provider<PaymentRepository> paymentRepositoryProvider = Provider<PaymentRe
 
 final Provider<BrightnessControl> brightnessProvider =
     Provider<BrightnessControl>((Ref ref) => ScreenBrightnessControl());
+
+final Provider<TripRepository> tripRepositoryProvider =
+    Provider<TripRepository>((Ref ref) => TripRepository(ref.watch(databaseProvider)));
+
+final Provider<TombstoneRepository> tombstoneRepositoryProvider =
+    Provider<TombstoneRepository>((Ref ref) => TombstoneRepository(ref.watch(databaseProvider)));

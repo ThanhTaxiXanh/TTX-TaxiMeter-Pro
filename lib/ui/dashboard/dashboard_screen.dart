@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/taximeter_engine.dart';
 import '../common/format.dart';
 import '../payment/bank_settings_screen.dart';
+import '../trips/trip_list_screen.dart';
 import '../payment/payment_dialog.dart';
 import 'trip_controller.dart';
 
@@ -70,6 +71,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       appBar: AppBar(
         title: const Text('TTX TaxiMeter Pro'),
         actions: <Widget>[
+          IconButton(
+            key: const Key('trip_list'),
+            tooltip: 'Chuyến đi',
+            icon: const Icon(Icons.history),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const TripListScreen()),
+            ),
+          ),
           IconButton(
             key: const Key('bank_settings'),
             tooltip: 'Tài khoản nhận tiền',
