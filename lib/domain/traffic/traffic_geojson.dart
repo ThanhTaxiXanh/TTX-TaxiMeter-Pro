@@ -17,8 +17,9 @@ String signColor(SignKind k) {
     case SignKind.restArea:
       return '#ba68c8';
     case SignKind.noOvertaking:
-    case SignKind.p133:
       return '#ff8a65';
+    case SignKind.p133:
+      return '#81c784';
   }
 }
 
@@ -43,7 +44,7 @@ String signLabel(SignKind k) {
     case SignKind.noOvertaking:
       return 'Cấm vượt';
     case SignKind.p133:
-      return 'Biển P.133';
+      return 'Hết cấm vượt';
   }
 }
 
@@ -77,7 +78,11 @@ Map<String, dynamic> poiGeoJson(Iterable<Poi> poi) => <String, dynamic>{
               'type': 'Point',
               'coordinates': <double>[p.lngE7 / 1e7, p.latE7 / 1e7],
             },
-            'properties': <String, dynamic>{'name': p.name, 'kind': p.kind},
+            'properties': <String, dynamic>{
+              'name': p.name,
+              'kind': p.kind,
+              'color': p.kind == 'fuel' ? '#ffd54f' : '#29b6f6',
+            },
           },
       ],
     };

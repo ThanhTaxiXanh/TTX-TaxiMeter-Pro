@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/taximeter_engine.dart';
+import '../../app/providers.dart';
 import '../common/format.dart';
 import '../map/map_screen.dart';
 import '../map/speed_limit_sign.dart';
@@ -22,6 +23,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     // Khoi phuc chuyen dang do sau khi app bi tat.
+    // Nap san du lieu bien bao/POI de ban do va canh bao khong phai cho.
+    ref.read(signIndexProvider);
+    ref.read(poiProvider);
     Future<void>.microtask(() async {
       final TripController c = ref.read(tripControllerProvider.notifier);
       await c.requestPermissionsOnLaunch();

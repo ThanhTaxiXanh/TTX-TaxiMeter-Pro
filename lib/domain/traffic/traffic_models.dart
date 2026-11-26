@@ -217,3 +217,25 @@ List<Poi> parsePoiJson(String jsonText) {
     return Poi(r[0] as int, r[1] as int, kinds[r[2] as int] as String, r[3] as String);
   }).toList();
 }
+
+/// Bien can ve tren man hinh ban do: theo tam camera va muc zoom (toi da [cap]).
+/// Zoom thap -> khong ve (qua day dac).
+List<NearbySign> viewportSigns(SignIndex idx, int latE7, int lngE7, double zoom, {int cap = 800}) {
+  if (zoom < 12.5) return const <NearbySign>[];
+  final int radius = zoom >= 15 ? 1500 : (zoom >= 14 ? 2500 : 4000);
+  final List<NearbySign> n = idx.nearby(latE7, lngE7, radius);
+  return n.length > cap ? n.sublist(0, cap) : n;
+}
+
+/// POI (tram xang/sac) trong khung nhin, gan tam truoc, toi da [cap].
+List<Poi> viewportPoi(List<Poi> all, int latE7, int lngE7, double zoom, {int cap = 600}) {
+  if (zoom < 11.5) return const <Poi>[];
+  final int radiusMm = (zoom >= 14 ? 3000 : 8000) * 1000;
+  final List<MapEntry<int, Poi>> hit = <MapEntry<int, Poi>>[];
+  for (final Poi p in all) {
+    final int d = distanceMm(latE7, lngE7, p.latE7, p.lngE7);
+    if (d <= radiusMm) hit.add(MapEntry<int, Poi>(d, p));
+  }
+  hit.sort((MapEntry<int, Poi> a, MapEntry<int, Poi> b) => a.key.compareTo(b.key));
+  return hit.take(cap).map((MapEntry<int, Poi> e) => e.value).toList();
+}

@@ -30,6 +30,7 @@ const int lat0 = 210000000; // 21 do Bac
 const int lng0 = 1061000000;
 
 void main() {
+  viewportTests();
   test('bearing: bon huong chinh va duong cheo', () {
     expect(bearingDegrees(0, 100), 0);
     expect(bearingDegrees(100, 0), 90);
@@ -130,5 +131,28 @@ void main() {
     final List<Poi> p = parsePoiJson(File('assets/data/poi.json').readAsStringSync());
     expect(p.length, 5311);
     expect(p.where((Poi e) => e.kind == 'fuel').length, 4899);
+  });
+}
+
+void viewportTests() {
+  test('viewport: zoom thap khong ve, cap so luong, gan tam truoc', () {
+    final List<List<int>> recs = <List<int>>[
+      for (int i = 0; i < 50; i++) <int>[lat0 + latE7ForMeters(10 * i), lng0, 7, 65535, 65535],
+    ];
+    final SignIndex idx = SignIndex.fromBytes(pack(recs));
+    expect(viewportSigns(idx, lat0, lng0, 11), isEmpty);
+    expect(viewportSigns(idx, lat0, lng0, 15).length, 50);
+    final List<NearbySign> capped = viewportSigns(idx, lat0, lng0, 15, cap: 5);
+    expect(capped.length, 5);
+    expect(capped.first.distanceM <= capped.last.distanceM, isTrue);
+
+    final List<Poi> poi = <Poi>[
+      Poi(lat0 + latE7ForMeters(500), lng0, 'fuel', 'A'),
+      Poi(lat0 + latE7ForMeters(5000), lng0, 'fuel', 'B'),
+      Poi(lat0 + latE7ForMeters(20000), lng0, 'charging_station', 'C'),
+    ];
+    expect(viewportPoi(poi, lat0, lng0, 10), isEmpty);
+    expect(viewportPoi(poi, lat0, lng0, 14).map((Poi p) => p.name), <String>['A']);
+    expect(viewportPoi(poi, lat0, lng0, 12).map((Poi p) => p.name), <String>['A', 'B']);
   });
 }

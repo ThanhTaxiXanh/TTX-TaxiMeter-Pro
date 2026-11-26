@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../app/providers.dart';
-import '../../core/geo.dart';
 import '../../data/map/map_source_service.dart';
 import '../../data/map/pmtiles_reader.dart';
 import '../../domain/traffic/traffic_geojson.dart';
@@ -107,13 +106,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       'poi',
       'poi-layer',
       const CircleLayerProperties(
-        circleRadius: 4,
-        circleColor: '#66bb6a',
-        circleStrokeColor: '#000000',
-        circleStrokeWidth: 1,
+        circleRadius: 8,
+        circleColor: <Object>['get', 'color'],
+        circleStrokeColor: '#ffffff',
+        circleStrokeWidth: 2,
       ),
     );
     _styleReady = true;
+    await _refreshOverlays();
   }
 
   Future<void> _onLocation(UserLocation loc) async {
@@ -140,25 +140,46 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _cameraAhead = cam;
       });
     }
-    // Lam moi lop cham khi di chuyen >= 100 m.
-    final bool far = !_hasLast || distanceMm(_lastLat, _lastLng, lat, lng) >= 100000;
-    if (far && _styleReady && _map != null) {
-      _hasLast = true;
-      _lastLat = lat;
-      _lastLng = lng;
-      await _map!.setGeoJsonSource('signs', signsGeoJson(idx.nearby(lat, lng, 1500)));
+  }
+
+  bool _refreshing = false;
+  bool _pending = false;
+
+  /// Ve lai bien bao + POI theo khung nhin hien tai (goi khi camera dung lai).
+  Future<void> _refreshOverlays() async {
+    final MapLibreMapController? m = _map;
+    final CameraPosition? cam = m?.cameraPosition;
+    if (m == null || cam == null || !_styleReady) return;
+    if (_refreshing) {
+      _pending = true;
+      return;
+    }
+    _refreshing = true;
+    try {
+      final int lat = (cam.target.latitude * 10000000).round();
+      final int lng = (cam.target.longitude * 10000000).round();
+      final SignIndex? idx = ref.read(signIndexProvider).valueOrNull;
+      if (idx != null) {
+        await m.setGeoJsonSource('signs', signsGeoJson(viewportSigns(idx, lat, lng, cam.zoom)));
+      }
       final List<Poi>? poi = ref.read(poiProvider).valueOrNull;
       if (poi != null) {
-        final List<Poi> close = poi
-            .where((Poi p) => distanceMm(lat, lng, p.latE7, p.lngE7) <= 3000000)
-            .toList();
-        await _map!.setGeoJsonSource('poi', poiGeoJson(close));
+        await m.setGeoJsonSource('poi', poiGeoJson(viewportPoi(poi, lat, lng, cam.zoom)));
       }
+    } finally {
+      _refreshing = false;
+    }
+    if (_pending && mounted) {
+      _pending = false;
+      await _refreshOverlays();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Nap du lieu bien bao/POI som va ve ngay khi nap xong.
+    ref.listen<AsyncValue<SignIndex>>(signIndexProvider, (_, __) => _refreshOverlays());
+    ref.listen<AsyncValue<List<Poi>>>(poiProvider, (_, __) => _refreshOverlays());
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bản đồ'),
@@ -216,6 +237,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           myLocationTrackingMode: MyLocationTrackingMode.tracking,
           onMapCreated: (MapLibreMapController c) => _map = c,
           onStyleLoadedCallback: _onStyleLoaded,
+          onCameraIdle: _refreshOverlays,
           onUserLocationUpdated: _onLocation,
         ),
         Positioned(
