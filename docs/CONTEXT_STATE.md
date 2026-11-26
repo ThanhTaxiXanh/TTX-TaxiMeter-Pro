@@ -3,7 +3,18 @@
 > AI: đọc file này sau `.github/copilot-instructions.md`. Cập nhật sau MỖI task.
 
 ## Trạng thái hiện tại
-- **Phase hiện tại:** Phase 4 — Chuyến đi, thùng rác, bia mộ, doanh thu, đối soát — HOÀN THÀNH (CI xanh).
+- **Phase hiện tại:** Phase 5 — MỘT PHẦN (5a/5b/5c xong, CI xanh). Còn: 5d.
+  - Dữ liệu chủ dự án cung cấp (2026-11-26): `signs_2026-10-13b.geojson` (70.971 biển, nguồn MapCar, `verification_status=unverified`) và `poi-vn-2026-11-16.geojson` (5.311 trạm xăng/sạc, ODbL © OpenStreetMap). `tool/convert_traffic_data.py` chuyển thành `assets/data/signs.bin` (13 byte/biển, ~0,9 MB) và `assets/data/poi.json`; POI nguồn lưu ở `data_src/`. Biển nguồn gốc 17 MB KHÔNG đưa vào repo (giữ file trên máy chủ dự án).
+  - Loại biển (type_index): 0 hết khu đông dân cư, 1 bắt đầu khu đông dân cư, 2 tốc độ tối đa (value km/h), 3 cấm vượt, 4 p133 (chưa rõ ý nghĩa, hiển thị trung tính "Biển P.133"), 5 điểm dừng nghỉ, 6 camera bắn tốc độ, 7 camera giám sát, 8 trạm thu phí, 9 hầm. `direction_raw` = hướng xe áp dụng (độ).
+  - `lib/domain/traffic/`: `SignIndex` (lưới ~1,1 km, truy vấn bán kính), hướng đi/phương vị bằng số nguyên, `currentSpeedLimit`, `signsAhead`, `HeadingTracker`, GeoJSON hiển thị. Chỉ hiển thị, KHÔNG ảnh hưởng cước.
+  - `lib/data/map/`: `PmTilesReader` (PMTiles v3, Dart thuần, thư mục gốc + lá, gzip), `LocalHttpTileServer` (127.0.0.1, `/style.json`, `/tiles/z/x/y.mvt`, 204 khi không có tile), `buildMapStyleJson` (tô màu theo tên lớp vector trong metadata, nền tối, CHƯA có nhãn chữ vì cần font glyph offline), `MapSourceService` (chọn file .pmtiles bằng file_picker, chuyển vào thư mục riêng của app; file `vietnam.pmtiles` 147 MB của chủ dự án KHÔNG nằm trong repo/APK).
+  - UI: `MapScreen` (MapLibre, vị trí người dùng, chấm biển bảng trong 1,5 km + trạm xăng/sạc trong 3 km, biển giới hạn tốc độ kiểu QCVN P.127 + cảnh báo camera), nút bản đồ trên Dashboard; Dashboard hiện biển tốc độ/cảnh báo camera khi đang chạy và tô đỏ tốc độ khi vượt giới hạn.
+  - CHƯA kiểm chứng trên điện thoại thật: MapLibre đọc style/tile từ máy chủ cục bộ; hình dạng schema của vietnam.pmtiles chưa biết (style dựa vào tên lớp).
+  - Còn lại 5d: `TrafficRepository` (bảng `traffic_override`: sửa/thêm giới hạn tốc độ, biển, camera thủ công), `TrafficListScreen`, `TrafficEditScreen`, `ReportReviewScreen` (bảng `traffic_report`).
+- **Next:** Phase 5d rồi Phase 6 (Settings 12 nhóm, Backup/Restore/Purge, Vùng nguy hiểm — gõ XOA).
+
+### (Lịch sử) Phase 4 / 3 / 2
+Phase 4 — Chuyến đi, thùng rác, bia mộ, doanh thu, đối soát — HOÀN THÀNH (CI xanh).
   - Dữ liệu: `lib/data/trip/trip_repository.dart` (danh sách/chi tiết, sửa ghi chú + cờ chạy thử có `trip_edit_log`, `addAdjustment` — KHÔNG bao giờ sửa `fare_total_vnd`, `moveToTrash`/`restoreFromTrash` bằng `archived`), `tombstone_repository.dart` (`deletePermanently`: chèn `trip_tombstone` → xoá phụ thuộc (adjustment, payment, raw GPS, raw_trace_meta) → `DELETE trip_record` trong 1 transaction; `setReconciled`; `restore` tạo lại chuyến `is_reconstructed=1` từ bia mộ, giữ nguyên cước), `trip_models.dart` (`RevenueSummary` thuần), `lib/domain/time/local_time.dart` (giờ VN bằng số nguyên).
   - UI: `TripListScreen` (vuốt trái → thùng rác, chừa 20px mép trái; menu: Doanh thu / Thùng rác / Chuyến đã xóa / Đối soát), `TripDetailScreen` (+ sửa ghi chú, điều chỉnh tiền, vào thùng rác), `TrashScreen` (khôi phục / xóa vĩnh viễn kèm lý do), `TombstoneScreen`, `ReconciliationScreen`, `RevenueScreen` (hôm nay / 7 ngày / tháng; bỏ qua thùng rác & chạy thử). Nút lịch sử chuyến trên Dashboard.
   - Chưa làm (để Phase 6): tự dọn thùng rác sau 30 ngày (PurgeService), xuất CSV trước khi dọn.
@@ -36,7 +47,7 @@ Phase 2 — HOÀN THÀNH (CI xanh: analyze sạch, test pass, build APK).
 | 2 | Foreground Service, TripActiveController, snapshot 3s, DashboardScreen | Xong (CI xanh) |
 | 3 | VietQR, BankRepository, QrPaymentDialog, luồng thanh toán | Xong (CI xanh) |
 | 4 | TripList/Detail, Tombstone, Trash, Revenue, Reconciliation | Xong (CI xanh) |
-| 5 | MapScreen, LocalHttpTileServer, Traffic, biển QCVN, ReportReview | Chưa bắt đầu |
+| 5 | MapScreen, LocalHttpTileServer, Traffic, biển QCVN, ReportReview | 5a-5c xong (CI xanh), còn 5d |
 | 6 | Settings (12 nhóm), Backup/Restore/Purge, Vùng nguy hiểm | Chưa bắt đầu |
 | 7 | Golden replay 5 GPX, tối ưu pin, APK release | Chưa bắt đầu |
 
@@ -85,10 +96,10 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - **Giữ nguyên spec Mục 4** cho `bank_account` (`trip_payment`, `trip_tombstone`): số tài khoản nằm trong `database.db` và vì vậy trong file backup, để restore xong không phải nhập lại gì. Lưu ý kỹ thuật cho Phase 3/6: `driver_bank_account.account_number_encrypted` mã hoá bằng khoá của thiết bị (flutter_secure_storage) nên restore sang máy khác sẽ không giải mã được; khi làm BankRepository/Backup cần chọn cách để số TK hiện tại vẫn restore được (vd lưu thêm bản đọc được trong backup, hoặc không mã hoá cột này).
 
 ## Việc còn chờ chủ dự án
-- Tài nguyên `traffic_signs.geojson` đang rỗng/chưa đưa vào repo (dùng ở Phase 5).
 - Ý nghĩa test "E8" đã hiểu = replay fixture (`replay_golden_test.dart`); nếu khác, báo lại.
 
 ## Nhật ký
+- 2026-11-26: Phase 5a-5c (dữ liệu biển báo/POI, PMTiles reader + tile server cục bộ, MapScreen, cảnh báo trên Dashboard); CI xanh.
 - 2026-11-26: Phase 4 xong (chuyến đi, thùng rác, tombstone transaction, doanh thu, đối soát); CI xanh.
 - 2026-11-26: Phase 3 code xong (VietQR, ngân hàng, thanh toán); sửa crash thiếu icon thông báo ở Phase 2.
 - 2026-11-26: Phase 2 xong (session, TripStore + khôi phục sau crash, TripController, Dashboard, quyền GPS nền); CI xanh.
