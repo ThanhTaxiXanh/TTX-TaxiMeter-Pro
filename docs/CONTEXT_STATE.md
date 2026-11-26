@@ -109,3 +109,12 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - 2026-11-24: Phase 1a — pubspec, lib/core (geo, tariff_config, gps_policy, taximeter_engine), 23 test; CI xanh; sửa audit CI chỉ khớp khóa dependency thật.
 - 2026-11-24: Thay danh sách điều cấm bằng bản chính thức của chủ dự án.
 - 2026-11-24: Phase 0 — tạo `.github/copilot-instructions.md`, 2 agent, 4 SKILL.md, `flutter-ci.yml`, `docs/CONTEXT_STATE.md`.
+
+## Phase 5e — Bản đồ 3D kiểu dẫn đường (CI xanh)
+- MapScreen luôn nghiêng 3D (tilt 60, nhà 3D fill-extrusion), không có chế độ 2D.
+- Biển báo/camera/POI luôn hiển thị bằng biểu tượng vẽ bằng canvas (map_icons.dart).
+- Nút nổi: vị trí, giao diện Tự động/Sáng/Tối (Auto theo giờ VN, 18h–6h tối), báo cáo, tốc độ, giới hạn tốc độ, tên đường; tự ẩn sau 5 s, chạm bản đồ hiện lại.
+- Khoảng cách tới trạm xăng/trạm sạc gần nhất và tới các biển phía trước.
+- Báo cáo biển: lưu traffic_report (PENDING).
+- Chưa kiểm tra trên máy thật: 3D, queryRenderedFeatures (tên đường), addImage.
+- Còn lại Phase 5d: TrafficRepository/TrafficListScreen/TrafficEditScreen/ReportReviewScreen + danh mục biển đầy đủ.
