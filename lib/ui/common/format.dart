@@ -34,3 +34,9 @@ String formatSpeedKmh(int mmps) {
   final int tenths = mmps * 36 ~/ 1000;
   return '${tenths ~/ 10},${tenths % 10} km/h';
 }
+
+/// 350 -> "350 m"; 1250 -> "1,2 km".
+String formatDistance(int meters) {
+  if (meters < 1000) return '$meters m';
+  return '${meters ~/ 1000},${(meters % 1000) ~/ 100} km';
+}

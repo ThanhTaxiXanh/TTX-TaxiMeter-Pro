@@ -17,6 +17,24 @@ class MapSourceService {
 
   PmTilesHeader? get header => _reader?.header;
   String? get styleUrl => _server?.styleUrl;
+  String? styleUrlFor({required bool light}) => _server?.styleUrlFor(light: light);
+
+  /// Che do giao dien ban do: auto | light | dark.
+  Future<String> loadTheme() async {
+    try {
+      final SharedPreferences sp = await SharedPreferences.getInstance();
+      final String? t = sp.getString('map_theme');
+      if (t == 'light' || t == 'dark' || t == 'auto') return t!;
+    } catch (_) {}
+    return 'auto';
+  }
+
+  Future<void> saveTheme(String t) async {
+    try {
+      final SharedPreferences sp = await SharedPreferences.getInstance();
+      await sp.setString('map_theme', t);
+    } catch (_) {}
+  }
 
   Future<String?> savedPath() async {
     try {

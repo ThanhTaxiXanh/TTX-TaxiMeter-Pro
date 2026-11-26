@@ -1,5 +1,13 @@
 import 'traffic_models.dart';
 
+/// Ten anh bieu tuong tren ban do cho tung bien / POI.
+String signIconName(TrafficSign s) {
+  if (s.kind == SignKind.maxSpeed && s.speedKmh > 0) return 'sign_speed_${s.speedKmh}';
+  return 'sign_${s.kind.name}';
+}
+
+String poiIconName(Poi p) => p.kind == 'fuel' ? 'poi_fuel' : 'poi_ev';
+
 /// Mau cham tren ban do theo loai bien (chi de hien thi).
 String signColor(SignKind k) {
   switch (k) {
@@ -61,6 +69,7 @@ Map<String, dynamic> signsGeoJson(Iterable<NearbySign> signs) => <String, dynami
             },
             'properties': <String, dynamic>{
               'color': signColor(n.sign.kind),
+              'icon': signIconName(n.sign),
               'kind': n.sign.kind.name,
               'speed': n.sign.speedKmh,
             },
@@ -82,6 +91,7 @@ Map<String, dynamic> poiGeoJson(Iterable<Poi> poi) => <String, dynamic>{
               'name': p.name,
               'kind': p.kind,
               'color': p.kind == 'fuel' ? '#ffd54f' : '#29b6f6',
+              'icon': poiIconName(p),
             },
           },
       ],

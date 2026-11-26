@@ -15,7 +15,11 @@ class LocalHttpTileServer {
   final PmTilesReader _reader;
 
   int get port => _server.port;
-  String get styleUrl => 'http://127.0.0.1:$port/style.json';
+  String get styleUrl => styleUrlFor(light: false);
+
+  /// Style sang/toi (cung may chu, doi bang tham so ?theme=).
+  String styleUrlFor({required bool light}) =>
+      'http://127.0.0.1:$port/style.json?theme=${light ? 'light' : 'dark'}';
 
   static Future<LocalHttpTileServer> start(PmTilesReader reader) async {
     final HttpServer s = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -53,7 +57,12 @@ class LocalHttpTileServer {
         res.write('ok');
       } else if (seg.length == 1 && seg[0] == 'style.json') {
         res.headers.contentType = ContentType.json;
-        res.write(buildMapStyleJson(port: port, header: _reader.header, metadata: _reader.metadata));
+        res.write(buildMapStyleJson(
+          port: port,
+          header: _reader.header,
+          metadata: _reader.metadata,
+          light: req.uri.queryParameters['theme'] == 'light',
+        ));
       } else if (seg.length == 4 && seg[0] == 'tiles') {
         final int? z = int.tryParse(seg[1]);
         final int? x = int.tryParse(seg[2]);

@@ -14,7 +14,9 @@ String buildMapStyleJson({
   required int port,
   required PmTilesHeader header,
   required Map<String, dynamic> metadata,
+  bool light = false,
 }) {
+  final _Palette c = light ? _Palette.light : _Palette.dark;
   final String ext = header.tileType == 1 ? 'mvt' : (header.tileType == 2 ? 'png' : 'jpg');
   final String url = 'http://127.0.0.1:$port/tiles/{z}/{x}/{y}.$ext';
   final Map<String, dynamic> source = <String, dynamic>{
@@ -28,7 +30,7 @@ String buildMapStyleJson({
     <String, dynamic>{
       'id': 'background',
       'type': 'background',
-      'paint': <String, dynamic>{'background-color': '#0f1417'},
+      'paint': <String, dynamic>{'background-color': c.background},
     },
   ];
 
@@ -56,12 +58,34 @@ String buildMapStyleJson({
       final int r = rank(id);
       if (_has(id, <String>['place', 'poi', 'label', 'housenumber', 'name'])) continue;
       final String fillColor = r == 0
-          ? (_has(id, <String>['park', 'green', 'landcover']) ? '#16301f' : '#141b1f')
+          ? (_has(id, <String>['park', 'green', 'landcover']) ? c.park : c.land)
           : r == 1
-              ? '#12304a'
+              ? c.water
               : r == 2
-                  ? '#242c31'
-                  : '#1b2328';
+                  ? c.building
+                  : c.land;
+      if (r == 2) {
+        // Cong trinh 3D: dung chieu cao trong du lieu, mac dinh 9 m.
+        layers.add(<String, dynamic>{
+          'id': '$id-3d',
+          'type': 'fill-extrusion',
+          'source': 'v',
+          'source-layer': id,
+          'minzoom': 14,
+          'filter': <Object>['==', r'$type', 'Polygon'],
+          'paint': <String, dynamic>{
+            'fill-extrusion-color': c.building,
+            'fill-extrusion-opacity': 0.9,
+            'fill-extrusion-height': <Object>[
+              'coalesce', <Object>['get', 'render_height'], <Object>['get', 'height'], 9,
+            ],
+            'fill-extrusion-base': <Object>[
+              'coalesce', <Object>['get', 'render_min_height'], <Object>['get', 'min_height'], 0,
+            ],
+          },
+        });
+        continue;
+      }
       layers.add(<String, dynamic>{
         'id': '$id-fill',
         'type': 'fill',
@@ -77,7 +101,7 @@ String buildMapStyleJson({
           'source': 'v',
           'source-layer': id,
           'filter': <Object>['==', r'$type', 'LineString'],
-          'paint': <String, dynamic>{'line-color': '#1f5a85', 'line-width': 1.2},
+          'paint': <String, dynamic>{'line-color': c.waterLine, 'line-width': 1.2},
         });
       } else if (r == 3) {
         layers.add(<String, dynamic>{
@@ -88,7 +112,7 @@ String buildMapStyleJson({
           'filter': <Object>['==', r'$type', 'LineString'],
           'layout': <String, dynamic>{'line-cap': 'round', 'line-join': 'round'},
           'paint': <String, dynamic>{
-            'line-color': '#7f8c93',
+            'line-color': c.road,
             'line-width': <Object>[
               'interpolate', <String>['linear'], <String>['zoom'], 10, 0.4, 14, 1.6, 18, 7,
             ],
@@ -101,7 +125,7 @@ String buildMapStyleJson({
           'source': 'v',
           'source-layer': id,
           'filter': <Object>['==', r'$type', 'LineString'],
-          'paint': <String, dynamic>{'line-color': '#4a5560', 'line-width': 0.8, 'line-dasharray': <num>[3, 2]},
+          'paint': <String, dynamic>{'line-color': c.boundary, 'line-width': 0.8, 'line-dasharray': <num>[3, 2]},
         });
       }
     }
@@ -113,4 +137,41 @@ String buildMapStyleJson({
     'sources': <String, dynamic>{'v': source},
     'layers': layers,
   });
+}
+
+class _Palette {
+  const _Palette({
+    required this.background,
+    required this.land,
+    required this.park,
+    required this.water,
+    required this.waterLine,
+    required this.building,
+    required this.road,
+    required this.boundary,
+  });
+
+  final String background, land, park, water, waterLine, building, road, boundary;
+
+  static const _Palette dark = _Palette(
+    background: '#0f1417',
+    land: '#141b1f',
+    park: '#16301f',
+    water: '#12304a',
+    waterLine: '#1f5a85',
+    building: '#2b343a',
+    road: '#8d9aa2',
+    boundary: '#4a5560',
+  );
+
+  static const _Palette light = _Palette(
+    background: '#eceff1',
+    land: '#f4f2ec',
+    park: '#cde6c3',
+    water: '#a9cdeb',
+    waterLine: '#7fb2dc',
+    building: '#d6d1c8',
+    road: '#ffffff',
+    boundary: '#b0a9a0',
+  );
 }

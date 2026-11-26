@@ -8,6 +8,7 @@ import '../data/db/app_database.dart';
 import '../data/map/map_source_service.dart';
 import '../domain/traffic/traffic_models.dart';
 import '../data/payment/payment_repository.dart';
+import '../data/traffic/traffic_report_repository.dart';
 import '../data/trip/tombstone_repository.dart';
 import '../data/trip/trip_repository.dart';
 import '../data/trip/trip_store.dart';
@@ -61,3 +62,6 @@ final FutureProvider<List<Poi>> poiProvider = FutureProvider<List<Poi>>((Ref ref
 
 final Provider<MapSourceService> mapSourceServiceProvider =
     Provider<MapSourceService>((Ref ref) => MapSourceService());
+
+final Provider<TrafficReportRepository> trafficReportRepositoryProvider =
+    Provider<TrafficReportRepository>((Ref ref) => TrafficReportRepository(ref.watch(databaseProvider)));

@@ -31,6 +31,7 @@ const int lng0 = 1061000000;
 
 void main() {
   viewportTests();
+  moreTests();
   test('bearing: bon huong chinh va duong cheo', () {
     expect(bearingDegrees(0, 100), 0);
     expect(bearingDegrees(100, 0), 90);
@@ -140,7 +141,7 @@ void viewportTests() {
       for (int i = 0; i < 50; i++) <int>[lat0 + latE7ForMeters(10 * i), lng0, 7, 65535, 65535],
     ];
     final SignIndex idx = SignIndex.fromBytes(pack(recs));
-    expect(viewportSigns(idx, lat0, lng0, 11), isEmpty);
+    expect(viewportSigns(idx, lat0, lng0, 10), isEmpty);
     expect(viewportSigns(idx, lat0, lng0, 15).length, 50);
     final List<NearbySign> capped = viewportSigns(idx, lat0, lng0, 15, cap: 5);
     expect(capped.length, 5);
@@ -151,8 +152,30 @@ void viewportTests() {
       Poi(lat0 + latE7ForMeters(5000), lng0, 'fuel', 'B'),
       Poi(lat0 + latE7ForMeters(20000), lng0, 'charging_station', 'C'),
     ];
-    expect(viewportPoi(poi, lat0, lng0, 10), isEmpty);
+    expect(viewportPoi(poi, lat0, lng0, 9), isEmpty);
     expect(viewportPoi(poi, lat0, lng0, 14).map((Poi p) => p.name), <String>['A']);
     expect(viewportPoi(poi, lat0, lng0, 12).map((Poi p) => p.name), <String>['A', 'B']);
+  });
+}
+
+void moreTests() {
+  test('POI gan nhat theo loai + gioi han', () {
+    final List<Poi> poi = <Poi>[
+      Poi(lat0 + latE7ForMeters(800), lng0, 'fuel', 'A'),
+      Poi(lat0 + latE7ForMeters(300), lng0, 'charging_station', 'C'),
+      Poi(lat0 + latE7ForMeters(500), lng0, 'fuel', 'B'),
+    ];
+    final NearestPoi f = nearestPoi(poi, lat0, lng0, <String>{'fuel'})!;
+    expect(f.poi.name, 'B');
+    expect((f.distanceM - 500).abs() <= 1, isTrue);
+    expect(nearestPoi(poi, lat0, lng0, <String>{'charging_station', 'charging_station_motorcycle'})!.poi.name, 'C');
+    expect(nearestPoi(poi, lat0, lng0, <String>{'fuel'}, maxM: 100), isNull);
+  });
+
+  test('ban dem theo gio Viet Nam', () {
+    expect(isNightVn(baseTsMs), isFalse); // 10:00 VN
+    expect(isNightVn(baseTsMs + 9 * 3600000), isTrue); // 19:00 VN
+    expect(isNightVn(baseTsMs - 5 * 3600000), isTrue); // 05:00 VN van la dem
+    expect(isNightVn(baseTsMs - 4 * 3600000), isFalse); // 06:00 VN
   });
 }
