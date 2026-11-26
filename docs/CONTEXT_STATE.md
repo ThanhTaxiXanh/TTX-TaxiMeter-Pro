@@ -3,7 +3,7 @@
 > AI: đọc file này sau `.github/copilot-instructions.md`. Cập nhật sau MỖI task.
 
 ## Trạng thái hiện tại
-- **Phase hiện tại:** Phase 3 — VietQR & thanh toán (chờ CI xanh để chốt). Phase 2 đã xong và chạy được trên điện thoại thật.
+- **Phase hiện tại:** Phase 3 — VietQR & thanh toán — HOÀN THÀNH (CI xanh). Phase 2 đã xong và chạy được trên điện thoại thật.
   - `lib/payment/vietqr_payload_builder.dart` (TLV + CRC16-CCITT-FALSE tự viết, khớp vector `E9AB`), `qr_content_generator.dart` (TTX+YYMMDD+NNN, giờ VN bằng số nguyên).
   - `lib/data/bank/`: danh mục ngân hàng nhúng sẵn (`bank_seed.dart`, 41 mục; BIN cần đối chiếu NAPAS trước khi dùng thật), `BankRepository` (seed, tài khoản nhận tiền). Theo quyết định chủ dự án: số TK lưu ĐỌC ĐƯỢC trong `driver_bank_account.account_number_encrypted` (tên cột giữ nguyên) để restore không phải nhập lại.
   - `lib/data/payment/payment_repository.dart`: ghi `trip_payment` (CASH→PAID; QR→UNPAID→PAID khi tài xế bấm "Đã nhận tiền"), số thứ tự chuyến trong ngày.
@@ -26,7 +26,7 @@ Phase 2 — HOÀN THÀNH (CI xanh: analyze sạch, test pass, build APK).
 | 0 | GitHub Brain & CI | Xong (commit) |
 | 1 | Flutter, Drift, TariffConfigV2, Engine (12 test), GpsPolicy (8 test) | Xong (CI xanh) |
 | 2 | Foreground Service, TripActiveController, snapshot 3s, DashboardScreen | Xong (CI xanh) |
-| 3 | VietQR, BankRepository, QrPaymentDialog, luồng thanh toán | Đã code, chờ CI |
+| 3 | VietQR, BankRepository, QrPaymentDialog, luồng thanh toán | Xong (CI xanh) |
 | 4 | TripList/Detail, Tombstone, Trash, Revenue, Reconciliation | Chưa bắt đầu |
 | 5 | MapScreen, LocalHttpTileServer, Traffic, biển QCVN, ReportReview | Chưa bắt đầu |
 | 6 | Settings (12 nhóm), Backup/Restore/Purge, Vùng nguy hiểm | Chưa bắt đầu |
