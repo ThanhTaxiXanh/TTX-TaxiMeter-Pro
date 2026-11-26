@@ -176,7 +176,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
           const Divider(),
           row('Thanh toán', paymentLabel(t.paymentMethod, t.paymentState)),
           row('Biểu giá', '${d.configId} v${d.configVersion}'),
-          row('Mã băm cước', d.fareHash.substring(0, 12)),
+          row('Mã băm cước', (d.fareHash.length > 12 ? d.fareHash.substring(0, 12) : d.fareHash)),
           if (t.note != null) row('Ghi chú', t.note!),
           if (t.isTest) const Text('Chuyến chạy thử: không tính vào doanh thu.'),
           if (d.isReconstructed) const Text('Chuyến được khôi phục từ bản ghi đã xóa.'),
