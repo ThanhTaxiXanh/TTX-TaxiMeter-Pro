@@ -104,7 +104,7 @@ void main() {
     expect(h.headingDeg, -1);
     h.update(lat0 + latE7ForMeters(20), lng0);
     expect(h.headingDeg, 0);
-    h.update(lat0 + latE7ForMeters(20), lng0 + 400);
+    h.update(lat0 + latE7ForMeters(20), lng0 + 1000);
     expect(h.headingDeg, 90);
   });
 

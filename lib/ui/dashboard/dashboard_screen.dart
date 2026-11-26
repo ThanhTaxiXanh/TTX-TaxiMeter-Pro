@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/taximeter_engine.dart';
 import '../common/format.dart';
+import '../map/map_screen.dart';
+import '../map/speed_limit_sign.dart';
 import '../payment/bank_settings_screen.dart';
 import '../trips/trip_list_screen.dart';
 import '../payment/payment_dialog.dart';
@@ -72,6 +74,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         title: const Text('TTX TaxiMeter Pro'),
         actions: <Widget>[
           IconButton(
+            key: const Key('map'),
+            tooltip: 'Bản đồ',
+            icon: const Icon(Icons.map),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const MapScreen()),
+            ),
+          ),
+          IconButton(
             key: const Key('trip_list'),
             tooltip: 'Chuyến đi',
             icon: const Icon(Icons.history),
@@ -137,9 +147,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             k: 'waiting',
                             highlight: s.waitingNow,
                           ),
-                          _Metric(label: 'TỐC ĐỘ', value: formatSpeedKmh(s.speedMmps), k: 'speed'),
+                          _Metric(
+                            label: 'TỐC ĐỘ',
+                            value: formatSpeedKmh(s.speedMmps),
+                            k: 'speed',
+                            danger: s.speedLimitKmh > 0 &&
+                                s.speedMmps >= 0 &&
+                                s.speedMmps * 36 ~/ 1000 > s.speedLimitKmh * 10,
+                          ),
                         ],
                       ),
+                      if (s.running && (s.speedLimitKmh > 0 || s.cameraAheadM >= 0))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              if (s.speedLimitKmh > 0) SpeedLimitSign(kmh: s.speedLimitKmh, size: 64),
+                              if (s.cameraAheadM >= 0)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 16),
+                                  child: Chip(
+                                    key: const Key('camera_warning'),
+                                    avatar: const Icon(Icons.videocam, size: 18),
+                                    label: Text('Camera cách ${s.cameraAheadM} m'),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -171,11 +207,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 }
 
 class _Metric extends StatelessWidget {
-  const _Metric({required this.label, required this.value, required this.k, this.highlight = false});
+  const _Metric({required this.label, required this.value, required this.k, this.highlight = false, this.danger = false});
   final String label;
   final String value;
   final String k;
   final bool highlight;
+  final bool danger;
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +226,7 @@ class _Metric extends StatelessWidget {
             key: Key(k),
             style: t.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w600,
-              color: highlight ? t.colorScheme.tertiary : null,
+              color: danger ? t.colorScheme.error : (highlight ? t.colorScheme.tertiary : null),
             ),
           ),
         ],

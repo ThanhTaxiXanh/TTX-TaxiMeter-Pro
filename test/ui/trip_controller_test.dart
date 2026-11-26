@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ttx/app/providers.dart';
 import 'package:ttx/data/db/app_database.dart';
 import 'package:ttx/domain/models/gps_sample.dart';
+import 'package:ttx/domain/traffic/traffic_models.dart';
 import 'package:ttx/platform/location_service.dart';
 import 'package:ttx/platform/screen_awake.dart';
 import 'package:ttx/ui/dashboard/trip_controller.dart';
@@ -41,12 +42,15 @@ void main() {
   late FakeAwake awake;
   late int now;
 
+  List<TrafficSign> signs = <TrafficSign>[];
+
   ProviderContainer make() {
     final ProviderContainer c = ProviderContainer(overrides: <Override>[
       databaseProvider.overrideWithValue(db),
       locationServiceProvider.overrideWithValue(loc),
       screenAwakeProvider.overrideWithValue(awake),
       clockProvider.overrideWithValue(() => now),
+      signIndexProvider.overrideWith((Ref ref) async => SignIndex(signs)),
     ]);
     addTearDown(c.dispose);
     return c;
@@ -57,6 +61,7 @@ void main() {
     loc = FakeLocation(LocationPermissionState.granted);
     awake = FakeAwake();
     now = baseTsMs;
+    signs = <TrafficSign>[];
   });
   tearDown(() async => db.close());
 
@@ -96,6 +101,28 @@ void main() {
     final ProviderContainer c = make();
     await c.read(tripControllerProvider.notifier).requestPermissionsOnLaunch();
     expect(c.read(tripControllerProvider).error, isNotNull);
+  });
+
+  test('bien bao: gioi han toc do va canh bao camera phia truoc', () async {
+    signs = <TrafficSign>[
+      TrafficSign(latE7: latE7ForMeters(150), lngE7: 0, kind: SignKind.maxSpeed, dirDeg: 0, speedKmh: 60),
+      TrafficSign(latE7: latE7ForMeters(400), lngE7: 0, kind: SignKind.speedCamera, dirDeg: -1, speedKmh: -1),
+      TrafficSign(latE7: latE7ForMeters(100), lngE7: 0, kind: SignKind.maxSpeed, dirDeg: 180, speedKmh: 30),
+    ];
+    final ProviderContainer c = make();
+    await c.read(signIndexProvider.future);
+    final TripController ctl = c.read(tripControllerProvider.notifier);
+    await ctl.startTrip();
+    for (int i = 0; i <= 40; i++) {
+      now = baseTsMs + i * 1000;
+      loc.ctl.add(gs(i * 1000, latE7: latE7ForMeters(i * 10)));
+      await pump();
+    }
+    final TripUiState s = c.read(tripControllerProvider);
+    expect(s.speedLimitKmh, 60); // bien nguoc huong (30) bi bo qua
+    expect(s.cameraAheadM, greaterThanOrEqualTo(0));
+    expect(s.cameraAheadM, lessThanOrEqualTo(500));
+    await ctl.stopTrip();
   });
 
   test('thieu quyen vi tri -> bao loi, khong tao chuyen', () async {

@@ -1,7 +1,12 @@
+import 'dart:typed_data';
+
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/bank/bank_repository.dart';
 import '../data/db/app_database.dart';
+import '../data/map/map_source_service.dart';
+import '../domain/traffic/traffic_models.dart';
 import '../data/payment/payment_repository.dart';
 import '../data/trip/tombstone_repository.dart';
 import '../data/trip/trip_repository.dart';
@@ -43,3 +48,16 @@ final Provider<TripRepository> tripRepositoryProvider =
 
 final Provider<TombstoneRepository> tombstoneRepositoryProvider =
     Provider<TombstoneRepository>((Ref ref) => TombstoneRepository(ref.watch(databaseProvider)));
+
+/// Chi muc ~71k bien bao (assets/data/signs.bin), nap mot lan.
+final FutureProvider<SignIndex> signIndexProvider = FutureProvider<SignIndex>((Ref ref) async {
+  final ByteData d = await rootBundle.load('assets/data/signs.bin');
+  return SignIndex.fromBytes(d.buffer.asUint8List(d.offsetInBytes, d.lengthInBytes));
+});
+
+final FutureProvider<List<Poi>> poiProvider = FutureProvider<List<Poi>>((Ref ref) async {
+  return parsePoiJson(await rootBundle.loadString('assets/data/poi.json'));
+});
+
+final Provider<MapSourceService> mapSourceServiceProvider =
+    Provider<MapSourceService>((Ref ref) => MapSourceService());

@@ -175,7 +175,7 @@ void main() {
       },
     ));
     final LocalHttpTileServer s = await LocalHttpTileServer.start(r);
-    final HttpClient c = HttpClient();
+    final HttpClient c = HttpClient()..autoUncompress = false;
     try {
       Future<HttpClientResponse> get(String p) async =>
           (await c.getUrl(Uri.parse('http://127.0.0.1:${s.port}$p'))).close();

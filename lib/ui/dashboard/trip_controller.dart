@@ -8,6 +8,7 @@ import '../../data/trip/trip_store.dart';
 import '../../domain/models/gps_sample.dart';
 import '../../domain/models/tariff_config_v2.dart';
 import '../../domain/trip/active_trip_session.dart';
+import '../../domain/traffic/traffic_models.dart';
 import '../../platform/location_service.dart';
 
 enum TripPhase { idle, running, saving }
@@ -23,6 +24,8 @@ class TripUiState {
     this.elapsedSec = 0,
     this.speedMmps = -1,
     this.waitingNow = false,
+    this.speedLimitKmh = 0,
+    this.cameraAheadM = -1,
     this.gps = GpsStatus.none,
     this.error,
     this.finished,
@@ -38,6 +41,12 @@ class TripUiState {
   final int elapsedSec;
   final int speedMmps;
   final bool waitingNow;
+
+  /// Gioi han toc do tu bien bao gan nhat (0 = khong biet).
+  final int speedLimitKmh;
+
+  /// Khoang cach toi camera phia truoc (m); -1 = khong co trong 500 m.
+  final int cameraAheadM;
   final GpsStatus gps;
   final String? error;
 
@@ -57,6 +66,8 @@ class TripUiState {
     int? elapsedSec,
     int? speedMmps,
     bool? waitingNow,
+    int? speedLimitKmh,
+    int? cameraAheadM,
     GpsStatus? gps,
     String? error,
     bool clearError = false,
@@ -74,6 +85,8 @@ class TripUiState {
         elapsedSec: elapsedSec ?? this.elapsedSec,
         speedMmps: speedMmps ?? this.speedMmps,
         waitingNow: waitingNow ?? this.waitingNow,
+        speedLimitKmh: speedLimitKmh ?? this.speedLimitKmh,
+        cameraAheadM: cameraAheadM ?? this.cameraAheadM,
         gps: gps ?? this.gps,
         error: clearError ? null : (error ?? this.error),
         finished: clearFinished ? null : (finished ?? this.finished),
@@ -96,6 +109,9 @@ class TripController extends Notifier<TripUiState> {
   Timer? _tickTimer;
   int _flushedSeq = 0;
   int _lastSampleArrivalMs = 0;
+  final HeadingTracker _heading = HeadingTracker();
+  int _speedLimit = 0;
+  int _cameraAhead = -1;
 
   TripStore get _store => ref.read(tripStoreProvider);
   int _now() => ref.read(clockProvider)();
@@ -203,7 +219,26 @@ class TripController extends Notifier<TripUiState> {
     if (ses == null) return;
     ses.addSample(s);
     _lastSampleArrivalMs = _now();
+    _updateTraffic(s);
     _publish();
+  }
+
+  /// Tra cuu bien bao quanh vi tri (chi de hien thi, khong anh huong cuoc).
+  void _updateTraffic(GpsSample s) {
+    _heading.update(s.latE7, s.lngE7);
+    final SignIndex? idx = ref.read(signIndexProvider).valueOrNull;
+    final int h = _heading.headingDeg;
+    if (idx == null || h < 0) return;
+    final List<NearbySign> near = idx.nearby(s.latE7, s.lngE7, 500);
+    final NearbySign? lim = currentSpeedLimit(near, h);
+    if (lim != null) _speedLimit = lim.sign.speedKmh;
+    _cameraAhead = -1;
+    for (final NearbySign n in signsAhead(near, h)) {
+      if (n.sign.kind == SignKind.speedCamera || n.sign.kind == SignKind.streetCamera) {
+        _cameraAhead = n.distanceM;
+        break;
+      }
+    }
   }
 
   /// Moi giay: cap nhat dong ho va tinh trang GPS.
@@ -242,6 +277,8 @@ class TripController extends Notifier<TripUiState> {
       elapsedSec: (now - ses.startedAtMs) ~/ 1000,
       speedMmps: f.lastSpeedMmps,
       waitingNow: f.waitingNow,
+      speedLimitKmh: _speedLimit,
+      cameraAheadM: _cameraAhead,
       gps: gps != null && last == null ? gps : g,
     );
   }
