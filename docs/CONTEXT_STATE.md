@@ -118,3 +118,12 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - Báo cáo biển: lưu traffic_report (PENDING).
 - Chưa kiểm tra trên máy thật: 3D, queryRenderedFeatures (tên đường), addImage.
 - Còn lại Phase 5d: TrafficRepository/TrafficListScreen/TrafficEditScreen/ReportReviewScreen + danh mục biển đầy đủ.
+
+## Phase 5d — Sửa tay biển báo/camera + duyệt báo cáo (CI xanh) ⇒ Phase 5 HOÀN TẤT
+- lib/domain/traffic/traffic_overrides.dart: validate, applyOverrides (thêm điểm / ẩn biển nguồn trong 30 m, source='REMOVE'), parse/format độ E7 bằng số nguyên.
+- lib/data/traffic/traffic_repository.dart: CRUD traffic_override; approveReport/rejectReport (giao dịch: tạo override + đóng báo cáo).
+- UI: TrafficListScreen (nút 🚦 trên Dashboard), TrafficEditScreen, ReportReviewScreen.
+- signIndexProvider gộp override; sau khi sửa gọi ref.invalidate(signIndexProvider) (bản đồ cập nhật khi mở lại).
+- Test: test/traffic/overrides_test.dart.
+- Chưa có: danh mục biển QCVN đầy đủ (tìm theo mã) — cần dữ liệu từ chủ app.
+- Tiếp theo: Phase 6 (Cài đặt 12 nhóm, Backup/Restore/Purge, CSV, "XOA").
