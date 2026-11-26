@@ -9,14 +9,14 @@ class ScreenBrightnessControl implements BrightnessControl {
   @override
   Future<void> setMax() async {
     try {
-      await ScreenBrightness().setScreenBrightness(1.0);
+      await ScreenBrightness().setApplicationScreenBrightness(1.0);
     } catch (_) {}
   }
 
   @override
   Future<void> restore() async {
     try {
-      await ScreenBrightness().resetScreenBrightness();
+      await ScreenBrightness().resetApplicationScreenBrightness();
     } catch (_) {}
   }
 }

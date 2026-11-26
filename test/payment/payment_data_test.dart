@@ -128,8 +128,8 @@ void main() {
       await open(tester);
       await tester.tap(find.byKey(const Key('pay_cash')));
       await tester.pumpAndSettle();
-      final PaymentInfo? info =
-          await tester.runAsync(() => PaymentRepository(db).get('T1'));
+      final PaymentInfo? info = await tester
+          .runAsync<PaymentInfo?>(() => PaymentRepository(db).get('T1'));
       expect(info!.method, 'CASH');
       expect(info.state, 'PAID');
     });
@@ -140,7 +140,7 @@ void main() {
       await tester.tap(find.byKey(const Key('pay_qr')));
       await tester.pumpAndSettle();
       expect(find.textContaining('Chưa cài tài khoản'), findsOneWidget);
-      expect(await tester.runAsync(() => PaymentRepository(db).get('T1')), isNull);
+      expect(await tester.runAsync<PaymentInfo?>(() => PaymentRepository(db).get('T1')), isNull);
     });
 
     testWidgets('QR dung payload; xac nhan da nhan tien -> PAID', (WidgetTester tester) async {
@@ -166,7 +166,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('qr_paid')));
       await tester.pumpAndSettle();
-      expect((await tester.runAsync(() => PaymentRepository(db).get('T1')))!.state, 'PAID');
+      expect((await tester.runAsync<PaymentInfo?>(() => PaymentRepository(db).get('T1')))!.state, 'PAID');
       expect(br.restored, 1);
     });
   });
