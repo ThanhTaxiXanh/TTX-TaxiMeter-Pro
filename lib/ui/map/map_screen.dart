@@ -27,8 +27,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   MapLibreMapController? _map;
   bool _styleReady = false;
   final HeadingTracker _heading = HeadingTracker();
-  int _lastLat = 0, _lastLng = 0;
-  bool _hasLast = false;
   int _speedLimit = 0;
   int _cameraAhead = -1;
 
