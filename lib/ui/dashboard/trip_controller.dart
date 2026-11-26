@@ -26,6 +26,8 @@ class TripUiState {
     this.gps = GpsStatus.none,
     this.error,
     this.finished,
+    this.finishedTripId,
+    this.finishedStartedAtMs,
     this.restored = false,
   });
 
@@ -41,6 +43,8 @@ class TripUiState {
 
   /// Chuyen vua ket thuc (de hien tong ket 1 lan).
   final FareResult? finished;
+  final String? finishedTripId;
+  final int? finishedStartedAtMs;
   final bool restored;
 
   bool get running => phase == TripPhase.running;
@@ -57,6 +61,8 @@ class TripUiState {
     String? error,
     bool clearError = false,
     FareResult? finished,
+    String? finishedTripId,
+    int? finishedStartedAtMs,
     bool clearFinished = false,
     bool? restored,
   }) =>
@@ -71,6 +77,8 @@ class TripUiState {
         gps: gps ?? this.gps,
         error: clearError ? null : (error ?? this.error),
         finished: clearFinished ? null : (finished ?? this.finished),
+        finishedTripId: clearFinished ? null : (finishedTripId ?? this.finishedTripId),
+        finishedStartedAtMs: clearFinished ? null : (finishedStartedAtMs ?? this.finishedStartedAtMs),
         restored: restored ?? this.restored,
       );
 }
@@ -252,7 +260,11 @@ class TripController extends Notifier<TripUiState> {
       final FareResult fin = ses.finalFare();
       _session = null;
       _flushedSeq = 0;
-      state = TripUiState(finished: fin);
+      state = TripUiState(
+        finished: fin,
+        finishedTripId: ses.tripId,
+        finishedStartedAtMs: ses.startedAtMs,
+      );
     } catch (e) {
       _session = null;
       state = TripUiState(error: 'Không lưu được chuyến: $e');

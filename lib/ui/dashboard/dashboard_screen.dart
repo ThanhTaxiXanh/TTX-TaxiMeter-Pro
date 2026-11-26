@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/taximeter_engine.dart';
 import '../common/format.dart';
+import '../payment/bank_settings_screen.dart';
+import '../payment/payment_dialog.dart';
 import 'trip_controller.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -52,37 +54,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         final FareResult f = next.finished!;
         showDialog<void>(
           context: context,
-          builder: (BuildContext c) => AlertDialog(
-            title: const Text('Đã lưu chuyến'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(formatVnd(f.fareTotal),
-                    style: Theme.of(c).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text('Quãng đường: ${formatKm(f.distanceM)}'),
-                Text('Chờ: ${formatDuration(f.waitingSec)}'),
-              ],
-            ),
-            actions: <Widget>[
-              FilledButton(
-                onPressed: () {
-                  Navigator.pop(c);
-                  ctl.dismissFinished();
-                },
-                child: const Text('Xong'),
-              ),
-            ],
+          barrierDismissible: false,
+          builder: (BuildContext c) => PaymentDialog(
+            tripId: next.finishedTripId!,
+            startedAtMs: next.finishedStartedAtMs!,
+            amountVnd: f.fareTotal,
+            distanceM: f.distanceM,
+            waitingSec: f.waitingSec,
           ),
-        );
+        ).then((_) => ctl.dismissFinished());
       }
     });
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('TTX TaxiMeter Pro'),
-        actions: <Widget>[_GpsChip(status: s.gps)],
+        actions: <Widget>[
+          IconButton(
+            key: const Key('bank_settings'),
+            tooltip: 'Tài khoản nhận tiền',
+            icon: const Icon(Icons.account_balance),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const BankSettingsScreen()),
+            ),
+          ),
+          _GpsChip(status: s.gps),
+        ],
       ),
       body: SafeArea(
         child: Padding(

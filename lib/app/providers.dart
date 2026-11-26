@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/bank/bank_repository.dart';
 import '../data/db/app_database.dart';
+import '../data/payment/payment_repository.dart';
 import '../data/trip/trip_store.dart';
+import '../platform/brightness_control.dart';
 import '../platform/location_service.dart';
 import '../platform/screen_awake.dart';
 
@@ -23,3 +26,12 @@ final Provider<ScreenAwake> screenAwakeProvider =
 final Provider<int Function()> clockProvider = Provider<int Function()>(
   (Ref ref) => () => DateTime.now().millisecondsSinceEpoch,
 );
+
+final Provider<BankRepository> bankRepositoryProvider =
+    Provider<BankRepository>((Ref ref) => BankRepository(ref.watch(databaseProvider)));
+
+final Provider<PaymentRepository> paymentRepositoryProvider = Provider<PaymentRepository>(
+    (Ref ref) => PaymentRepository(ref.watch(databaseProvider)));
+
+final Provider<BrightnessControl> brightnessProvider =
+    Provider<BrightnessControl>((Ref ref) => ScreenBrightnessControl());
