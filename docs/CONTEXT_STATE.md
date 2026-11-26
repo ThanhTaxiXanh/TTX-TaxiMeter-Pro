@@ -3,7 +3,15 @@
 > AI: đọc file này sau `.github/copilot-instructions.md`. Cập nhật sau MỖI task.
 
 ## Trạng thái hiện tại
-- **Phase hiện tại:** Phase 3 — VietQR & thanh toán — HOÀN THÀNH (CI xanh). Phase 2 đã xong và chạy được trên điện thoại thật.
+- **Phase hiện tại:** Phase 4 — Chuyến đi, thùng rác, bia mộ, doanh thu, đối soát — HOÀN THÀNH (CI xanh).
+  - Dữ liệu: `lib/data/trip/trip_repository.dart` (danh sách/chi tiết, sửa ghi chú + cờ chạy thử có `trip_edit_log`, `addAdjustment` — KHÔNG bao giờ sửa `fare_total_vnd`, `moveToTrash`/`restoreFromTrash` bằng `archived`), `tombstone_repository.dart` (`deletePermanently`: chèn `trip_tombstone` → xoá phụ thuộc (adjustment, payment, raw GPS, raw_trace_meta) → `DELETE trip_record` trong 1 transaction; `setReconciled`; `restore` tạo lại chuyến `is_reconstructed=1` từ bia mộ, giữ nguyên cước), `trip_models.dart` (`RevenueSummary` thuần), `lib/domain/time/local_time.dart` (giờ VN bằng số nguyên).
+  - UI: `TripListScreen` (vuốt trái → thùng rác, chừa 20px mép trái; menu: Doanh thu / Thùng rác / Chuyến đã xóa / Đối soát), `TripDetailScreen` (+ sửa ghi chú, điều chỉnh tiền, vào thùng rác), `TrashScreen` (khôi phục / xóa vĩnh viễn kèm lý do), `TombstoneScreen`, `ReconciliationScreen`, `RevenueScreen` (hôm nay / 7 ngày / tháng; bỏ qua thùng rác & chạy thử). Nút lịch sử chuyến trên Dashboard.
+  - Chưa làm (để Phase 6): tự dọn thùng rác sau 30 ngày (PurgeService), xuất CSV trước khi dọn.
+  - Doanh thu = cước gốc + điều chỉnh; chưa có biểu đồ (fl_chart) — thêm sau nếu cần.
+- **Next:** Phase 5 — MapScreen (MapLibre + PMTiles offline qua LocalHttpTileServer), TrafficRepository, biển báo QCVN, ReportReviewScreen. CẦN chủ dự án cung cấp: file `.pmtiles` khu vực hoạt động và `traffic_signs.geojson` (hiện rỗng).
+
+### (Lịch sử) Phase 3 / 2
+Phase 3 — VietQR & thanh toán — HOÀN THÀNH (CI xanh). Phase 2 đã xong và chạy được trên điện thoại thật.
   - `lib/payment/vietqr_payload_builder.dart` (TLV + CRC16-CCITT-FALSE tự viết, khớp vector `E9AB`), `qr_content_generator.dart` (TTX+YYMMDD+NNN, giờ VN bằng số nguyên).
   - `lib/data/bank/`: danh mục ngân hàng nhúng sẵn (`bank_seed.dart`, 41 mục; BIN cần đối chiếu NAPAS trước khi dùng thật), `BankRepository` (seed, tài khoản nhận tiền). Theo quyết định chủ dự án: số TK lưu ĐỌC ĐƯỢC trong `driver_bank_account.account_number_encrypted` (tên cột giữ nguyên) để restore không phải nhập lại.
   - `lib/data/payment/payment_repository.dart`: ghi `trip_payment` (CASH→PAID; QR→UNPAID→PAID khi tài xế bấm "Đã nhận tiền"), số thứ tự chuyến trong ngày.
@@ -27,7 +35,7 @@ Phase 2 — HOÀN THÀNH (CI xanh: analyze sạch, test pass, build APK).
 | 1 | Flutter, Drift, TariffConfigV2, Engine (12 test), GpsPolicy (8 test) | Xong (CI xanh) |
 | 2 | Foreground Service, TripActiveController, snapshot 3s, DashboardScreen | Xong (CI xanh) |
 | 3 | VietQR, BankRepository, QrPaymentDialog, luồng thanh toán | Xong (CI xanh) |
-| 4 | TripList/Detail, Tombstone, Trash, Revenue, Reconciliation | Chưa bắt đầu |
+| 4 | TripList/Detail, Tombstone, Trash, Revenue, Reconciliation | Xong (CI xanh) |
 | 5 | MapScreen, LocalHttpTileServer, Traffic, biển QCVN, ReportReview | Chưa bắt đầu |
 | 6 | Settings (12 nhóm), Backup/Restore/Purge, Vùng nguy hiểm | Chưa bắt đầu |
 | 7 | Golden replay 5 GPX, tối ưu pin, APK release | Chưa bắt đầu |
@@ -81,6 +89,7 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - Ý nghĩa test "E8" đã hiểu = replay fixture (`replay_golden_test.dart`); nếu khác, báo lại.
 
 ## Nhật ký
+- 2026-11-26: Phase 4 xong (chuyến đi, thùng rác, tombstone transaction, doanh thu, đối soát); CI xanh.
 - 2026-11-26: Phase 3 code xong (VietQR, ngân hàng, thanh toán); sửa crash thiếu icon thông báo ở Phase 2.
 - 2026-11-26: Phase 2 xong (session, TripStore + khôi phục sau crash, TripController, Dashboard, quyền GPS nền); CI xanh.
 - 2026-11-25: Phase 1b (android/, APK build trên CI) và 1c (Drift schema + trigger sổ cái + test) xong; CI xanh, 59 test → Phase 1 hoàn thành, sẵn sàng Phase 2.
