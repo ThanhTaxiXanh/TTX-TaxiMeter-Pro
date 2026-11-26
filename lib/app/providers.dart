@@ -8,6 +8,8 @@ import '../data/db/app_database.dart';
 import '../data/map/map_source_service.dart';
 import '../domain/traffic/traffic_models.dart';
 import '../data/payment/payment_repository.dart';
+import '../data/traffic/traffic_repository.dart';
+import '../domain/traffic/traffic_overrides.dart';
 import '../data/traffic/traffic_report_repository.dart';
 import '../data/trip/tombstone_repository.dart';
 import '../data/trip/trip_repository.dart';
@@ -53,7 +55,15 @@ final Provider<TombstoneRepository> tombstoneRepositoryProvider =
 /// Chi muc ~71k bien bao (assets/data/signs.bin), nap mot lan.
 final FutureProvider<SignIndex> signIndexProvider = FutureProvider<SignIndex>((Ref ref) async {
   final ByteData d = await rootBundle.load('assets/data/signs.bin');
-  return SignIndex.fromBytes(d.buffer.asUint8List(d.offsetInBytes, d.lengthInBytes));
+  final SignIndex base = SignIndex.fromBytes(d.buffer.asUint8List(d.offsetInBytes, d.lengthInBytes));
+  // Gop du lieu sua tay (them diem, an bien khong con). Loi DB khong chan ban do.
+  try {
+    final List<TrafficOverrideItem> ov = await ref.watch(trafficRepositoryProvider).list();
+    if (ov.isEmpty) return base;
+    return SignIndex(applyOverrides(base.signs, ov, ref.read(clockProvider)()));
+  } catch (_) {
+    return base;
+  }
 });
 
 final FutureProvider<List<Poi>> poiProvider = FutureProvider<List<Poi>>((Ref ref) async {
@@ -65,3 +75,6 @@ final Provider<MapSourceService> mapSourceServiceProvider =
 
 final Provider<TrafficReportRepository> trafficReportRepositoryProvider =
     Provider<TrafficReportRepository>((Ref ref) => TrafficReportRepository(ref.watch(databaseProvider)));
+
+final Provider<TrafficRepository> trafficRepositoryProvider =
+    Provider<TrafficRepository>((Ref ref) => TrafficRepository(ref.watch(databaseProvider)));

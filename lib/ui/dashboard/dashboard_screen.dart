@@ -5,6 +5,7 @@ import '../../core/taximeter_engine.dart';
 import '../../app/providers.dart';
 import '../common/format.dart';
 import '../map/map_screen.dart';
+import '../traffic/traffic_list_screen.dart';
 import '../map/speed_limit_sign.dart';
 import '../payment/bank_settings_screen.dart';
 import '../trips/trip_list_screen.dart';
@@ -83,6 +84,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             icon: const Icon(Icons.map),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const MapScreen()),
+            ),
+          ),
+          IconButton(
+            key: const Key('traffic_list'),
+            tooltip: 'Biển báo & camera',
+            icon: const Icon(Icons.traffic),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const TrafficListScreen()),
             ),
           ),
           IconButton(
