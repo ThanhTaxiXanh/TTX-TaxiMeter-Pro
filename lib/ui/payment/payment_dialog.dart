@@ -114,13 +114,18 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
     final bool qrStage = _qr != null;
     return PopScope(
       canPop: false,
-      child: AlertDialog(
-        title: Text(qrStage ? 'Quét mã để thanh toán' : 'Đã lưu chuyến'),
-        content: SingleChildScrollView(
+      // Dung Dialog (khong phai AlertDialog): QrImageView dung LayoutBuilder,
+      // khong do duoc intrinsic size cua AlertDialog.
+      child: Dialog(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
+              Text(qrStage ? 'Quét mã để thanh toán' : 'Đã lưu chuyến',
+                  style: t.textTheme.titleLarge),
+              const SizedBox(height: 12),
               Text(formatVnd(widget.amountVnd),
                   key: const Key('pay_amount'),
                   style: t.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
@@ -150,10 +155,12 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(_error!, style: TextStyle(color: t.colorScheme.error)),
                 ),
-            ],
-          ),
-        ),
-        actions: qrStage
+              const SizedBox(height: 16),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: qrStage
             ? <Widget>[
                 TextButton(key: const Key('qr_close'), onPressed: _close, child: const Text('Đóng (chưa thu)')),
                 FilledButton(
@@ -178,6 +185,10 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                 TextButton(key: const Key('pay_qr'), onPressed: _showQr, child: const Text('Chuyển khoản QR')),
                 FilledButton(key: const Key('pay_cash'), onPressed: _cash, child: const Text('Tiền mặt')),
               ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
