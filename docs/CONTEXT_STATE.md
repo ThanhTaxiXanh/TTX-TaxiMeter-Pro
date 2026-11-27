@@ -133,3 +133,11 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - Nút phải (vị trí, giao diện, kiểu bản đồ, chọn file) tự ẩn 5 s; chip POI, biển phía trước, tốc độ, báo cáo, tên đường luôn hiện.
 - Không dùng: satellite*.json (MapTiler trả phí + online, vi phạm cấm #1), day/night phẳng (luôn 3D).
 - road-signs.txt: chỉ là danh sách mã biển/ghi công ảnh Wikimedia; chưa có ảnh/tên → chưa làm danh mục biển.
+
+## Phase 5g — Bản đồ nhãn chữ, tải liên tục phía trước, tên đường, danh mục biển (CI xanh)
+- Font Việt offline: tool/gen_glyphs.py sinh assets/glyphs/DejaVuSans-{Regular,Bold,Oblique}/*.pbf (SDF, dải 0-255, 256-511, 7680-7935, 8192-8447); tile server phục vụ /fonts/{stack}/{range}.pbf. style_adapter giữ lớp nhãn chữ (name:vi → name), bỏ icon/sprite/POI nền.
+- Biển/POI: khi bám theo xe chỉ vẽ phía trước xe ≤ 2 km, nạp lại khi xe đi ≥ 40 m hoặc đổi hướng ≥ 20° (aheadSigns/poiAhead/needsAheadRefresh). Kéo bản đồ → thôi bám xe, nút vị trí bật lại.
+- Cảnh báo khoảng cách biển 200/300/500 m (nút "Kiểu bản đồ", pref warn_m). Zoom bám xe 18.2, tối đa 20.5.
+- Tên đường: street_name.dart đọc MVT transportation_name trực tiếp từ PMTiles (offline); dự phòng queryRenderedFeatures.
+- Danh mục biển: assets/data/sign_catalog.json (390 mã từ road-signs.txt, 246 có tên từ voh.com.vn — trang Wikipedia không tải được), bảng chọn tab + tìm; báo cáo theo mã; duyệt → SignKind.other hiển thị trên bản đồ bằng icon mã.
+- Chưa kiểm tra trên máy thật: vị trí dọc của nhãn chữ (top glyph), hiệu năng tải liên tục. Ảnh biển chưa có (cần tệp ảnh).
