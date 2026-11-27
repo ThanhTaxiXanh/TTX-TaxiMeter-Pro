@@ -36,6 +36,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _loading = true;
 
   String _theme = 'auto'; // auto | light | dark
+  String _family = 'standard'; // standard | modern
   Timer? _themeTimer;
   Timer? _hideTimer;
   bool _uiVisible = true;
@@ -72,11 +73,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return !isNightVn(ref.read(clockProvider)());
   }
 
-  String? get _styleUrl => _baseUrl == null ? null : _service.styleUrlFor(light: _light);
+  String? get _styleUrl => _baseUrl == null ? null : _service.styleUrlFor(light: _light, family: _family);
 
   Future<void> _start() async {
     try {
       _theme = await _service.loadTheme();
+      _family = await _service.loadFamily();
       final String? path = await _service.savedPath();
       if (path == null) {
         setState(() => _loading = false);
@@ -313,6 +315,34 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     } catch (_) {}
   }
 
+  Future<void> _chooseFamily() async {
+    _showUi();
+    final String? f = await showModalBottomSheet<String>(
+      context: context,
+      builder: (BuildContext c) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (final MapEntry<String, String> e in const <String, String>{
+              'standard': 'Chuẩn 3D',
+              'modern': 'Hiện đại 3D',
+            }.entries)
+              ListTile(
+                key: Key('family_${e.key}'),
+                leading: Icon(_family == e.key ? Icons.radio_button_checked : Icons.radio_button_off),
+                title: Text(e.value),
+                onTap: () => Navigator.pop(c, e.key),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (f == null || f == _family) return;
+    setState(() => _family = f);
+    _service.saveFamily(f);
+    _applyTheme();
+  }
+
   Future<void> _recenter() async {
     _showUi();
     setState(() => _following = true);
@@ -414,15 +444,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             if (mounted) setState(() => _following = false);
           },
         ),
-        // Nut + thong tin: an sau 5 giay, cham ban do de hien lai.
-        AnimatedOpacity(
-          opacity: _uiVisible ? 1 : 0,
-          duration: const Duration(milliseconds: 250),
-          child: IgnorePointer(
-            ignoring: !_uiVisible,
-            child: SafeArea(child: _overlay(over)),
-          ),
-        ),
+        // Thong tin luon hien; chi nhom nut ben phai tu an sau 5 giay (cham ban do de hien lai).
+        SafeArea(child: _overlay(over)),
       ],
     );
   }
@@ -504,14 +527,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         Positioned(
           right: 12,
           top: 120,
-          child: Column(
-            children: <Widget>[
+          child: AnimatedOpacity(
+            opacity: _uiVisible ? 1 : 0,
+            duration: const Duration(milliseconds: 250),
+            child: IgnorePointer(
+              ignoring: !_uiVisible,
+              child: Column(
+                children: <Widget>[
               _roundButton(const Key('locate'), Icons.my_location, _recenter,
                   tooltip: 'Vị trí của tôi', active: _following),
               _roundButton(const Key('theme'), themeIcon, _cycleTheme,
                   tooltip: _theme == 'auto' ? 'Tự động theo giờ' : (_theme == 'light' ? 'Sáng' : 'Tối')),
+              _roundButton(const Key('map_style'), Icons.layers, _chooseFamily, tooltip: 'Kiểu bản đồ'),
               _roundButton(const Key('pick_map'), Icons.folder_open, _pick, tooltip: 'Chọn file bản đồ'),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
         // Trai duoi: bien phia truoc, gioi han toc do, toc do, bao cao.

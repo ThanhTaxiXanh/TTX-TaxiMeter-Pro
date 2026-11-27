@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,7 +18,42 @@ class MapSourceService {
 
   PmTilesHeader? get header => _reader?.header;
   String? get styleUrl => _server?.styleUrl;
-  String? styleUrlFor({required bool light}) => _server?.styleUrlFor(light: light);
+  String? styleUrlFor({required bool light, String family = 'standard'}) =>
+      _server?.styleUrlFor(light: light, family: family);
+
+  /// Kieu ban do: standard | modern.
+  Future<String> loadFamily() async {
+    try {
+      final SharedPreferences sp = await SharedPreferences.getInstance();
+      final String? t = sp.getString('map_family');
+      if (t == 'standard' || t == 'modern') return t!;
+    } catch (_) {}
+    return 'standard';
+  }
+
+  Future<void> saveFamily(String f) async {
+    try {
+      final SharedPreferences sp = await SharedPreferences.getInstance();
+      await sp.setString('map_family', f);
+    } catch (_) {}
+  }
+
+  static const List<String> _styleKeys = <String>[
+    'standard-day',
+    'standard-night',
+    'modern-day',
+    'modern-night',
+  ];
+
+  Future<Map<String, String>> _loadBaseStyles() async {
+    final Map<String, String> m = <String, String>{};
+    for (final String k in _styleKeys) {
+      try {
+        m[k] = await rootBundle.loadString('assets/styles/$k.json');
+      } catch (_) {}
+    }
+    return m;
+  }
 
   /// Che do giao dien ban do: auto | light | dark.
   Future<String> loadTheme() async {
@@ -50,7 +86,7 @@ class MapSourceService {
     await stop();
     final PmTilesReader r = await PmTilesReader.open(path);
     _reader = r;
-    _server = await LocalHttpTileServer.start(r);
+    _server = await LocalHttpTileServer.start(r, baseStyles: await _loadBaseStyles());
     return _server!.styleUrl;
   }
 
