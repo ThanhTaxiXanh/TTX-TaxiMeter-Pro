@@ -73,7 +73,7 @@ void main() {
       port: 1234,
       minZoom: 0,
       maxZoom: 14,
-      availableLayers: omt,
+      availableLayers: omt.difference(<String>{'poi'}),
     )!;
     final List<dynamic> layers = (jsonDecode(out) as Map<String, dynamic>)['layers'] as List<dynamic>;
     expect(layers.map((dynamic l) => (l as Map<String, dynamic>)['id']).toList(), <String>['bg', 'w', 'road-name']);

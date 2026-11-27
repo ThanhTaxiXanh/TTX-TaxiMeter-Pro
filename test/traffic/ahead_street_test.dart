@@ -85,7 +85,7 @@ void main() {
     expect(aheadSigns(idx, lat, lng, -1).length, 4);
     // Xe di qua bien -> bien phia truoc bien mat khoi danh sach.
     final List<NearbySign> after = aheadSigns(idx, lat, lng + 96 * 600, 90);
-    expect(after.length, 2); // con sign(1900) va sign(3000)
+    expect(after.length, 1); // chi con sign(1900) (sign(3000) van xa hon 2 km)
   });
 
   test('poiAhead loc theo huong va ban kinh', () {
