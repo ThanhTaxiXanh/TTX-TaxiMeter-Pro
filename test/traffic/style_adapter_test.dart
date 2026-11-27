@@ -5,7 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ttx/data/map/style_adapter.dart';
 
 void main() {
-  const Set<String> omt = <String>{'transportation', 'water', 'building', 'park', 'landuse', 'landcover'};
+  const Set<String> omt = <String>{
+    'transportation', 'water', 'building', 'park', 'landuse', 'landcover', 'aeroway', 'waterway', 'boundary'
+  };
 
   void check(String json) {
     final Map<String, dynamic> m = jsonDecode(json) as Map<String, dynamic>;
@@ -69,7 +71,7 @@ void main() {
     for (final String k in <String>['standard-day', 'standard-night', 'modern-day', 'modern-night']) {
       final String src = File('assets/styles/$k.json').readAsStringSync();
       final String out = adaptStyleForOffline(
-          styleJson: src, port: 1234, minZoom: 0, maxZoom: 14, availableLayers: omt.union(<String>{'aeroway', 'waterway', 'boundary'}))!;
+          styleJson: src, port: 1234, minZoom: 0, maxZoom: 14, availableLayers: omt)!;
       check(out);
       final List<dynamic> layers = (jsonDecode(out) as Map<String, dynamic>)['layers'] as List<dynamic>;
       expect(layers.any((dynamic l) => (l as Map<String, dynamic>)['type'] == 'fill-extrusion'), isTrue, reason: k);
