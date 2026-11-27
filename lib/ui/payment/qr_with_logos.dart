@@ -28,7 +28,7 @@ class QrWithLogos extends StatelessWidget {
             // Co logo giua thi dung muc H de van quet duoc.
             errorCorrectionLevel: centerLogo == null ? QrErrorCorrectLevel.M : QrErrorCorrectLevel.H,
             embeddedImage: centerLogo == null ? null : MemoryImage(centerLogo!),
-            embeddedImageStyle: EmbeddedImageStyle(size: Size(size * 0.2, size * 0.2)),
+            embeddedImageStyle: QrEmbeddedImageStyle(size: Size(size * 0.2, size * 0.2)),
           ),
           if (bottomLogo != null)
             Padding(
