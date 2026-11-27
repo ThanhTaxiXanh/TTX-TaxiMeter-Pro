@@ -266,3 +266,47 @@ bool isNightVn(int tsMs) {
   final int hour = ((tsMs + 7 * 3600000) ~/ 3600000) % 24;
   return hour >= 18 || hour < 6;
 }
+
+
+/// Bien phia truoc xe trong [radiusM] (mac dinh 2 km), gan nhat truoc. Khong biet huong -> moi phia.
+List<NearbySign> aheadSigns(SignIndex idx, int latE7, int lngE7, int headingDeg,
+    {int radiusM = 2000, int cap = 400}) {
+  final List<NearbySign> near = idx.nearby(latE7, lngE7, radiusM);
+  final List<NearbySign> l = headingDeg < 0 ? near : signsAhead(near, headingDeg);
+  return l.length > cap ? l.sublist(0, cap) : l;
+}
+
+/// POI (tram xang/sac) phia truoc xe trong [radiusM], gan nhat truoc.
+List<Poi> poiAhead(List<Poi> all, int latE7, int lngE7, int headingDeg, {int radiusM = 2000, int cap = 200}) {
+  final int radiusMm = radiusM * 1000;
+  final List<MapEntry<int, Poi>> hit = <MapEntry<int, Poi>>[];
+  for (final Poi p in all) {
+    final int d = distanceMm(latE7, lngE7, p.latE7, p.lngE7);
+    if (d > radiusMm) continue;
+    if (headingDeg >= 0 && d > 30000) {
+      final int b = bearingBetweenE7(latE7, lngE7, p.latE7, p.lngE7);
+      if (angleDiffDeg(b, headingDeg) > 100) continue;
+    }
+    hit.add(MapEntry<int, Poi>(d, p));
+  }
+  hit.sort((MapEntry<int, Poi> a, MapEntry<int, Poi> b) => a.key.compareTo(b.key));
+  return hit.take(cap).map((MapEntry<int, Poi> e) => e.value).toList();
+}
+
+/// Can nap lai bien/POI phia truoc khi xe da di >= [minMoveM] m hoac doi huong >= [minTurnDeg] do.
+bool needsAheadRefresh({
+  required bool hasLast,
+  required int lastLatE7,
+  required int lastLngE7,
+  required int lastHeadingDeg,
+  required int latE7,
+  required int lngE7,
+  required int headingDeg,
+  int minMoveM = 40,
+  int minTurnDeg = 20,
+}) {
+  if (!hasLast) return true;
+  if (distanceMm(lastLatE7, lastLngE7, latE7, lngE7) >= minMoveM * 1000) return true;
+  if (headingDeg >= 0 && (lastHeadingDeg < 0 || angleDiffDeg(lastHeadingDeg, headingDeg) >= minTurnDeg)) return true;
+  return false;
+}

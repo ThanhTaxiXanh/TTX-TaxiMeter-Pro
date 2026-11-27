@@ -69,3 +69,6 @@ flutter:
   assets:
     - assets/data/
     - assets/styles/
+    - assets/glyphs/DejaVuSans-Regular/
+    - assets/glyphs/DejaVuSans-Bold/
+    - assets/glyphs/DejaVuSans-Oblique/

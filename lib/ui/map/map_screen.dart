@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math show sin, cos;
 import 'dart:math' show Point;
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../../app/providers.dart';
+import '../../core/geo.dart';
 import '../../data/map/map_source_service.dart';
 import '../../data/map/pmtiles_reader.dart';
 import '../../domain/traffic/traffic_geojson.dart';
@@ -27,7 +29,8 @@ class MapScreen extends ConsumerStatefulWidget {
 class _MapScreenState extends ConsumerState<MapScreen> {
   static const Duration _hideAfter = Duration(seconds: 5);
   static const double _tilt = 60;
-  static const double _followZoom = 17;
+  static const double _followZoom = 18.2;
+  static const double _maxZoom = 20.5;
 
   late final MapSourceService _service = ref.read(mapSourceServiceProvider);
   String? _baseUrl;
@@ -56,6 +59,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   int _lat = 0, _lng = 0;
   bool _hasPos = false;
   int _lastStreetMs = 0;
+  int _warnM = 300;
+  List<NearbySign> _aheadAll = const <NearbySign>[];
+  bool _pushed = false;
+  int _pushLat = 0, _pushLng = 0, _pushHeading = -1;
+  int _cmdLat = 0, _cmdLng = 0;
+  int _heading_ = -1;
+  int _streetLat = 0, _streetLng = 0;
+  bool _hasStreetPos = false;
 
   @override
   void initState() {
@@ -79,6 +90,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     try {
       _theme = await _service.loadTheme();
       _family = await _service.loadFamily();
+      _warnM = await _service.loadWarnM();
       final String? path = await _service.savedPath();
       if (path == null) {
         setState(() => _loading = false);
@@ -199,6 +211,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
+  void _onCameraIdle() {
+    final CameraPosition? c = _map?.cameraPosition;
+    if (_following && c != null && _hasPos) {
+      final int lat = (c.target.latitude * 10000000).round();
+      final int lng = (c.target.longitude * 10000000).round();
+      // Camera lech xa diem dich da lenh -> nguoi dung tu keo ban do: thoi bam theo xe.
+      if (distanceMm(lat, lng, _cmdLat, _cmdLng) > 80000) {
+        setState(() => _following = false);
+      }
+    }
+    _refreshOverlays();
+  }
+
   bool _refreshing = false;
   bool _pending = false;
 
@@ -206,6 +231,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final MapLibreMapController? m = _map;
     final CameraPosition? cam = m?.cameraPosition;
     if (m == null || cam == null || !_styleReady) return;
+    if (_following && _hasPos) {
+      // Dang bam theo xe: chi ve bien/POI phia truoc xe (<= 2 km), nap lai khi xe di chuyen.
+      _pushed = false;
+      await _pushAhead(_lat, _lng, _heading_);
+      return;
+    }
     if (_refreshing) {
       _pending = true;
       return;
@@ -250,18 +281,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final int h = (b != null && b >= 0 && (loc.speed ?? 0) > 1) ? b.round() % 360 : _heading.headingDeg;
     final int kmh = ((loc.speed ?? 0) * 3.6).round();
 
+    _heading_ = h;
     final SignIndex? idx = ref.read(signIndexProvider).valueOrNull;
     int limit = _limitKmh;
-    List<NearbySign> ahead = const <NearbySign>[];
+    List<NearbySign> all = _aheadAll;
     if (idx != null) {
-      final List<NearbySign> near = idx.nearby(lat, lng, 600);
+      final List<NearbySign> near = idx.nearby(lat, lng, 300);
       if (h >= 0) {
         final NearbySign? lim = currentSpeedLimit(near, h);
         if (lim != null) limit = lim.sign.speedKmh;
-        ahead = signsAhead(near, h).where((NearbySign n) => n.distanceM > 5).take(3).toList();
-      } else {
-        ahead = near.take(3).toList();
       }
+      all = aheadSigns(idx, lat, lng, h);
     }
     final List<Poi>? poi = ref.read(poiProvider).valueOrNull;
     NearestPoi? fuel = _fuel, ev = _ev;
@@ -273,79 +303,168 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     setState(() {
       _speedKmh = kmh;
       _limitKmh = limit;
-      _ahead = ahead;
+      _aheadAll = all;
+      _ahead = all.where((NearbySign n) => n.distanceM > 5 && n.distanceM <= _warnM).take(3).toList();
       _fuel = fuel;
       _ev = ev;
     });
 
     if (first || _following) {
-      // Giu goc nhin 3D nghieng, huong theo chieu di.
+      // Goc nhin 3D nghieng, huong theo chieu di, xe nam thap hon giua man hinh.
+      LatLng target = loc.position;
+      if (h >= 0) {
+        final double r = h * 3.141592653589793 / 180.0;
+        final double dLat = 35 * _cos(r) / 111320.0;
+        final double dLng = 35 * _sin(r) / (111320.0 * _cos(loc.position.latitude * 3.141592653589793 / 180.0));
+        target = LatLng(loc.position.latitude + dLat, loc.position.longitude + dLng);
+      }
+      _cmdLat = (target.latitude * 10000000).round();
+      _cmdLng = (target.longitude * 10000000).round();
       await _map?.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
-        target: loc.position,
-        zoom: _followZoom,
+        target: target,
+        zoom: first ? _followZoom : (_map?.cameraPosition?.zoom ?? _followZoom),
         tilt: _tilt,
         bearing: h >= 0 ? h.toDouble() : 0,
       )));
     }
-    await _updateStreet(loc.position);
+    if (_following) {
+      final bool need = needsAheadRefresh(
+        hasLast: _pushed,
+        lastLatE7: _pushLat,
+        lastLngE7: _pushLng,
+        lastHeadingDeg: _pushHeading,
+        latE7: lat,
+        lngE7: lng,
+        headingDeg: h,
+      );
+      if (need) await _pushAhead(lat, lng, h);
+    }
+    await _updateStreet(loc.position, lat, lng);
   }
 
-  /// Ten duong: doc tu tile dang hien thi tai vi tri nguoi dung (khong can mang).
-  Future<void> _updateStreet(LatLng pos) async {
+  /// Ve bien + POI phia truoc xe (<= 2 km) len ban do.
+  Future<void> _pushAhead(int lat, int lng, int h) async {
     final MapLibreMapController? m = _map;
-    final int now = ref.read(clockProvider)();
-    if (m == null || !_styleReady || now - _lastStreetMs < 1500) return;
-    _lastStreetMs = now;
+    if (m == null || !_styleReady || _refreshing) return;
+    _refreshing = true;
     try {
-      final Point<num> sp = await m.toScreenLocation(pos);
-      final List<dynamic> feats = await m.queryRenderedFeatures(
-          Point<double>(sp.x.toDouble(), sp.y.toDouble()), <String>[], null);
-      String name = '';
-      for (final dynamic f in feats) {
-        final dynamic props = f is Map ? f['properties'] : null;
-        if (props is Map) {
-          final dynamic n = props['name:vi'] ?? props['name'] ?? props['name_vi'];
-          if (n is String && n.isNotEmpty) {
-            name = n;
-            break;
+      final SignIndex? idx = ref.read(signIndexProvider).valueOrNull;
+      if (idx != null) {
+        final List<NearbySign> v = aheadSigns(idx, lat, lng, h);
+        await _ensureIcons(v.map((NearbySign n) => signIconName(n.sign)).toSet());
+        await m.setGeoJsonSource('signs', signsGeoJson(v));
+      }
+      final List<Poi>? poi = ref.read(poiProvider).valueOrNull;
+      if (poi != null) {
+        final List<Poi> v = poiAhead(poi, lat, lng, h);
+        await _ensureIcons(v.map(poiIconName).toSet());
+        await m.setGeoJsonSource('poi', poiGeoJson(v));
+      }
+      _pushed = true;
+      _pushLat = lat;
+      _pushLng = lng;
+      _pushHeading = h;
+    } catch (_) {
+      // Thu lai o lan cap nhat vi tri ke tiep.
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  static double _sin(double r) => math.sin(r);
+  static double _cos(double r) => math.cos(r);
+
+  /// Ten duong: doc truc tiep tu tile PMTiles (offline), du phong bang lop dang hien thi.
+  Future<void> _updateStreet(LatLng pos, int lat, int lng) async {
+    final int now = ref.read(clockProvider)();
+    if (now - _lastStreetMs < 1200) return;
+    if (_hasStreetPos && distanceMm(_streetLat, _streetLng, lat, lng) < 8000) return;
+    _lastStreetMs = now;
+    String? name = await _service.streetNameAt(lat, lng);
+    final MapLibreMapController? m = _map;
+    if (name == null && m != null && _styleReady) {
+      try {
+        final Point<num> sp = await m.toScreenLocation(pos);
+        final List<dynamic> feats = await m.queryRenderedFeatures(
+            Point<double>(sp.x.toDouble(), sp.y.toDouble()), <String>[], null);
+        for (final dynamic f in feats) {
+          final dynamic props = f is Map ? f['properties'] : null;
+          if (props is Map) {
+            final dynamic n = props['name:vi'] ?? props['name'] ?? props['name_vi'];
+            if (n is String && n.isNotEmpty) {
+              name = n;
+              break;
+            }
           }
         }
-      }
-      if (mounted && name != _street) setState(() => _street = name);
-    } catch (_) {}
+      } catch (_) {}
+    }
+    _streetLat = lat;
+    _streetLng = lng;
+    _hasStreetPos = true;
+    if (mounted && name != null && name != _street) setState(() => _street = name!);
   }
 
   Future<void> _chooseFamily() async {
     _showUi();
-    final String? f = await showModalBottomSheet<String>(
+    await showModalBottomSheet<void>(
       context: context,
-      builder: (BuildContext c) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            for (final MapEntry<String, String> e in const <String, String>{
-              'standard': 'Chuẩn 3D',
-              'modern': 'Hiện đại 3D',
-            }.entries)
-              ListTile(
-                key: Key('family_${e.key}'),
-                leading: Icon(_family == e.key ? Icons.radio_button_checked : Icons.radio_button_off),
-                title: Text(e.value),
-                onTap: () => Navigator.pop(c, e.key),
-              ),
-          ],
+      builder: (BuildContext c) => StatefulBuilder(
+        builder: (BuildContext c, StateSetter set) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text('Kiểu bản đồ'),
+                const SizedBox(height: 8),
+                SegmentedButton<String>(
+                  key: const Key('family_picker'),
+                  segments: const <ButtonSegment<String>>[
+                    ButtonSegment<String>(value: 'standard', label: Text('Chuẩn 3D')),
+                    ButtonSegment<String>(value: 'modern', label: Text('Hiện đại 3D')),
+                  ],
+                  selected: <String>{_family},
+                  onSelectionChanged: (Set<String> v) {
+                    set(() {});
+                    setState(() => _family = v.first);
+                    _service.saveFamily(v.first);
+                    _applyTheme();
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text('Cảnh báo khoảng cách tới biển'),
+                const SizedBox(height: 8),
+                SegmentedButton<int>(
+                  key: const Key('warn_picker'),
+                  segments: const <ButtonSegment<int>>[
+                    ButtonSegment<int>(value: 200, label: Text('200 m')),
+                    ButtonSegment<int>(value: 300, label: Text('300 m')),
+                    ButtonSegment<int>(value: 500, label: Text('500 m')),
+                  ],
+                  selected: <int>{_warnM},
+                  onSelectionChanged: (Set<int> v) {
+                    set(() {});
+                    setState(() {
+                      _warnM = v.first;
+                      _ahead = _aheadAll.where((NearbySign n) => n.distanceM > 5 && n.distanceM <= _warnM).take(3).toList();
+                    });
+                    _service.saveWarnM(v.first);
+                  },
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
-    if (f == null || f == _family) return;
-    setState(() => _family = f);
-    _service.saveFamily(f);
-    _applyTheme();
   }
 
   Future<void> _recenter() async {
     _showUi();
     setState(() => _following = true);
+    _pushed = false;
     if (_hasPos) {
       await _map?.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
         target: LatLng(_lat / 1e7, _lng / 1e7),
@@ -429,7 +548,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             zoom: h.centerZoom.toDouble().clamp(h.minZoom.toDouble(), h.maxZoom.toDouble()),
             tilt: _tilt,
           ),
-          minMaxZoomPreference: MinMaxZoomPreference(h.minZoom.toDouble(), h.maxZoom.toDouble() + 2),
+          minMaxZoomPreference: MinMaxZoomPreference(h.minZoom.toDouble(), _maxZoom),
           trackCameraPosition: true,
           compassEnabled: false,
           myLocationEnabled: true,
@@ -437,7 +556,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           myLocationRenderMode: MyLocationRenderMode.gps,
           onMapCreated: (MapLibreMapController c) => _map = c,
           onStyleLoadedCallback: _onStyleLoaded,
-          onCameraIdle: _refreshOverlays,
+          onCameraIdle: _onCameraIdle,
           onUserLocationUpdated: _onLocation,
           onMapClick: (_, __) => _showUi(),
           onCameraTrackingDismissed: () {

@@ -10,13 +10,16 @@ import 'style_adapter.dart';
 ///   GET /tiles/{z}/{x}/{y}.{mvt|png|jpg} -> tile (204 neu khong co)
 ///   GET /health
 class LocalHttpTileServer {
-  LocalHttpTileServer._(this._server, this._reader, this._baseStyles);
+  LocalHttpTileServer._(this._server, this._reader, this._baseStyles, this._glyphLoader);
 
   final HttpServer _server;
   final PmTilesReader _reader;
 
   /// Style goc theo khoa '<kieu>-<day|night>' (kieu: standard | modern).
   final Map<String, String> _baseStyles;
+
+  /// Doc glyph PBF (stack, range) tu assets; null -> tra PBF rong.
+  final Future<Uint8List?> Function(String stack, String range)? _glyphLoader;
 
   int get port => _server.port;
   String get styleUrl => styleUrlFor(light: false);
@@ -26,9 +29,10 @@ class LocalHttpTileServer {
       'http://127.0.0.1:$port/style.json?theme=${light ? 'light' : 'dark'}&family=$family';
 
   static Future<LocalHttpTileServer> start(PmTilesReader reader,
-      {Map<String, String> baseStyles = const <String, String>{}}) async {
+      {Map<String, String> baseStyles = const <String, String>{},
+      Future<Uint8List?> Function(String stack, String range)? glyphLoader}) async {
     final HttpServer s = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final LocalHttpTileServer self = LocalHttpTileServer._(s, reader, baseStyles);
+    final LocalHttpTileServer self = LocalHttpTileServer._(s, reader, baseStyles, glyphLoader);
     s.listen(self._handle);
     return self;
   }
@@ -82,6 +86,21 @@ class LocalHttpTileServer {
       } else if (seg.length == 1 && seg[0] == 'style.json') {
         res.headers.contentType = ContentType.json;
         res.write(_style(req.uri.queryParameters['theme'] == 'light', req.uri.queryParameters['family'] ?? 'standard'));
+      } else if (seg.length == 3 && seg[0] == 'fonts') {
+        final String stack = Uri.decodeComponent(seg[1]).split(',').first.trim();
+        final String range = seg[2].endsWith('.pbf') ? seg[2].substring(0, seg[2].length - 4) : seg[2];
+        final bool safe = RegExp(r'^[A-Za-z0-9_\-]+$').hasMatch(stack) && RegExp(r'^\d+-\d+$').hasMatch(range);
+        Uint8List? data;
+        if (safe && _glyphLoader != null) {
+          try {
+            data = await _glyphLoader!(stack, range);
+          } catch (_) {}
+        }
+        data ??= Uint8List.fromList(emptyGlyphPbf(safe ? stack : 'x', safe ? range : '0-0'));
+        res.headers.set(HttpHeaders.contentTypeHeader, 'application/x-protobuf');
+        res.headers.set(HttpHeaders.cacheControlHeader, 'max-age=86400');
+        res.contentLength = data.length;
+        if (req.method == 'GET') res.add(data);
       } else if (seg.length == 4 && seg[0] == 'tiles') {
         final int? z = int.tryParse(seg[1]);
         final int? x = int.tryParse(seg[2]);

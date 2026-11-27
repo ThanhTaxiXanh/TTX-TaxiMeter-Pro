@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'local_tile_server.dart';
 import 'pmtiles_reader.dart';
+import 'street_name.dart';
 
 /// Quan ly file ban do .pmtiles (chon tu dien thoai) va may chu tile cuc bo.
 class MapSourceService {
@@ -18,6 +19,17 @@ class MapSourceService {
 
   PmTilesHeader? get header => _reader?.header;
   String? get styleUrl => _server?.styleUrl;
+  /// Ten duong gan vi tri nhat doc truc tiep tu tile (offline); null neu khong tim thay.
+  Future<String?> streetNameAt(int latE7, int lngE7) async {
+    final PmTilesReader? r = _reader;
+    if (r == null) return null;
+    try {
+      return await streetNameFromReader(r, latE7, lngE7);
+    } catch (_) {
+      return null;
+    }
+  }
+
   String? styleUrlFor({required bool light, String family = 'standard'}) =>
       _server?.styleUrlFor(light: light, family: family);
 
@@ -35,6 +47,23 @@ class MapSourceService {
     try {
       final SharedPreferences sp = await SharedPreferences.getInstance();
       await sp.setString('map_family', f);
+    } catch (_) {}
+  }
+
+  /// Khoang cach canh bao bien (m): 200 | 300 | 500.
+  Future<int> loadWarnM() async {
+    try {
+      final SharedPreferences sp = await SharedPreferences.getInstance();
+      final int? v = sp.getInt('warn_m');
+      if (v == 200 || v == 300 || v == 500) return v!;
+    } catch (_) {}
+    return 300;
+  }
+
+  Future<void> saveWarnM(int m) async {
+    try {
+      final SharedPreferences sp = await SharedPreferences.getInstance();
+      await sp.setInt('warn_m', m);
     } catch (_) {}
   }
 
@@ -86,7 +115,12 @@ class MapSourceService {
     await stop();
     final PmTilesReader r = await PmTilesReader.open(path);
     _reader = r;
-    _server = await LocalHttpTileServer.start(r, baseStyles: await _loadBaseStyles());
+    _server = await LocalHttpTileServer.start(r,
+        baseStyles: await _loadBaseStyles(),
+        glyphLoader: (String stack, String range) async {
+          final ByteData d = await rootBundle.load('assets/glyphs/$stack/$range.pbf');
+          return d.buffer.asUint8List(d.offsetInBytes, d.lengthInBytes);
+        });
     return _server!.styleUrl;
   }
 
