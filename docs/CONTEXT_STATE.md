@@ -127,3 +127,9 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - Test: test/traffic/overrides_test.dart.
 - Chưa có: danh mục biển QCVN đầy đủ (tìm theo mã) — cần dữ liệu từ chủ app.
 - Tiếp theo: Phase 6 (Cài đặt 12 nhóm, Backup/Restore/Purge, CSV, "XOA").
+
+## Phase 5f — Style bản đồ 3D offline (CI xanh)
+- assets/styles/{standard,modern}-{day,night}.json (từ MapCar, schema OpenMapTiles). lib/data/map/style_adapter.dart đổi nguồn sang tile server 127.0.0.1, bỏ lớp raster/symbol (không có font/sprite offline), bỏ source-layer không có trong file. Không phải OpenMapTiles → dùng style tự sinh.
+- Nút phải (vị trí, giao diện, kiểu bản đồ, chọn file) tự ẩn 5 s; chip POI, biển phía trước, tốc độ, báo cáo, tên đường luôn hiện.
+- Không dùng: satellite*.json (MapTiler trả phí + online, vi phạm cấm #1), day/night phẳng (luôn 3D).
+- road-signs.txt: chỉ là danh sách mã biển/ghi công ảnh Wikimedia; chưa có ảnh/tên → chưa làm danh mục biển.
