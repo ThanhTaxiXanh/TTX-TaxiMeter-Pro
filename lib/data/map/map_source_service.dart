@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data' show ByteData;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart' show rootBundle;

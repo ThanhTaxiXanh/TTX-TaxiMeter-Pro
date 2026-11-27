@@ -93,7 +93,7 @@ class LocalHttpTileServer {
         Uint8List? data;
         if (safe && _glyphLoader != null) {
           try {
-            data = await _glyphLoader!(stack, range);
+            data = await _glyphLoader(stack, range);
           } catch (_) {}
         }
         data ??= Uint8List.fromList(emptyGlyphPbf(safe ? stack : 'x', safe ? range : '0-0'));
