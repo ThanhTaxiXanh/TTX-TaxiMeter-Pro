@@ -141,3 +141,12 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - Tên đường: street_name.dart đọc MVT transportation_name trực tiếp từ PMTiles (offline); dự phòng queryRenderedFeatures.
 - Danh mục biển: assets/data/sign_catalog.json (390 mã từ road-signs.txt, 246 có tên từ voh.com.vn — trang Wikipedia không tải được), bảng chọn tab + tìm; báo cáo theo mã; duyệt → SignKind.other hiển thị trên bản đồ bằng icon mã.
 - Chưa kiểm tra trên máy thật: vị trí dọc của nhãn chữ (top glyph), hiệu năng tải liên tục. Ảnh biển chưa có (cần tệp ảnh).
+
+## Phase 6 — Settings, Backup/Restore, Purge (CI xanh)
+- Cài đặt (nút ⚙ ở Dashboard) gồm 9 nhóm: Biểu giá (nhập JSON, tự retire ACTIVE cũ), Tài khoản nhận tiền, Bản đồ, Biển báo & camera, Giao diện (pref `ui_theme`), Sao lưu & khôi phục, Dọn dẹp dữ liệu, Vùng nguy hiểm, Giới thiệu. (Bản spec 12 nhóm không có trong tay; chọn 9 nhóm này — chờ chủ app đối chiếu.)
+- Backup ZIP: database.db (VACUUM INTO) + preferences.json (allowlist `backupPrefKeys`, không có đường dẫn file bản đồ) + manifest + checksums.sha256. Restore: verify checksum+schema → auto-backup → ATTACH + integrity_check → 1 transaction (tắt/bật lại trigger sổ cái); lỗi thì rollback.
+- Quyết định chủ app (2026-11-25): số TK của tài xế lưu dạng đọc được trong DB nên backup/restore không phải nhập lại.
+- Thùng rác 30 ngày: tự dọn khi mở app (CSV lưu trước, tombstone được ghi trước khi DELETE). GPS thô: xóa điểm, giữ raw_points_hash.
+- Vùng nguy hiểm: mọi thao tác gõ "XOA"; xóa tombstone có thẻ xác nhận riêng.
+- Test: test/settings/phase6_test.dart.
+- Việc còn lại → Phase 7: golden replay, hiệu năng/pin, APK release + khóa ký.
