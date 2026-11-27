@@ -5,6 +5,7 @@ import '../../core/taximeter_engine.dart';
 import '../../app/providers.dart';
 import '../common/format.dart';
 import '../map/map_screen.dart';
+import '../settings/settings_screen.dart';
 import '../traffic/traffic_list_screen.dart';
 import '../map/speed_limit_sign.dart';
 import '../payment/bank_settings_screen.dart';
@@ -27,6 +28,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     // Nap san du lieu bien bao/POI de ban do va canh bao khong phai cho.
     ref.read(signIndexProvider);
     ref.read(poiProvider);
+    ref.read(autoMaintenanceProvider);
     Future<void>.microtask(() async {
       final TripController c = ref.read(tripControllerProvider.notifier);
       await c.requestPermissionsOnLaunch();
@@ -108,6 +110,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             icon: const Icon(Icons.account_balance),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const BankSettingsScreen()),
+            ),
+          ),
+          IconButton(
+            key: const Key('settings'),
+            tooltip: 'Cài đặt',
+            icon: const Icon(Icons.settings),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
             ),
           ),
           _GpsChip(status: s.gps),

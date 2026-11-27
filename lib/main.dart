@@ -19,15 +19,15 @@ void main() {
   ));
 }
 
-class TtxApp extends StatelessWidget {
+class TtxApp extends ConsumerWidget {
   const TtxApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       title: 'TTX TaxiMeter Pro',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark,
+      themeMode: ref.watch(themeModeProvider),
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.green),
       darkTheme: ThemeData(
         useMaterial3: true,
