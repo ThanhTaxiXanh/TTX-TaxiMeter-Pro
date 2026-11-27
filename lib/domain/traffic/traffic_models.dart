@@ -15,6 +15,9 @@ enum SignKind {
   streetCamera,
   tollBooth,
   tunnel,
+
+  /// Bien khac trong danh muc QCVN (xem TrafficSign.code); khong co trong signs.bin.
+  other,
 }
 
 class TrafficSign {
@@ -24,7 +27,11 @@ class TrafficSign {
     required this.kind,
     required this.dirDeg,
     required this.speedKmh,
+    this.code,
   });
+
+  /// Ma bien QCVN (vi du P.103a) cho kind = other.
+  final String? code;
 
   final int latE7;
   final int lngE7;
@@ -110,7 +117,7 @@ class SignIndex {
       final int cat = b.getUint8(o + 8);
       final int dir = b.getUint16(o + 9, Endian.little);
       final int val = b.getUint16(o + 11, Endian.little);
-      if (cat >= SignKind.values.length) {
+      if (cat >= SignKind.other.index) {
         throw FormatException('Loai bien khong hop le: $cat');
       }
       list.add(TrafficSign(

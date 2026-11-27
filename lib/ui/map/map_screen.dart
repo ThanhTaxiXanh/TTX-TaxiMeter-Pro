@@ -682,9 +682,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       for (final NearbySign n in _ahead)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Text('${signLabel(n.sign.kind)}'
-                              '${n.sign.kind == SignKind.maxSpeed ? ' ${n.sign.speedKmh}' : ''}'
-                              '  ${formatDistance(n.distanceM)}'),
+                          child: Text('${signDisplayName(n.sign)}  ${formatDistance(n.distanceM)}'),
                         ),
                     ],
                   ),

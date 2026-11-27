@@ -66,6 +66,27 @@ Future<Uint8List?> renderMapIcon(String name) async {
       _text(c, s, '$v', Colors.black, v >= 100 ? 30 : 40);
     });
   }
+  if (name.startsWith('sign_code:')) {
+    final String code = name.substring(10);
+    final String g = code.startsWith('IE') || code.startsWith('R.E') ? 'I' : code.substring(0, 1);
+    final String short = code.replaceFirst('.', '');
+    return _render((Canvas c, double s) {
+      switch (g) {
+        case 'P':
+          _disc(c, s, Colors.white, const Color(0xFFD32F2F), 9);
+          _text(c, s, short, Colors.black, short.length > 5 ? 16 : 20);
+        case 'W':
+          _square(c, s, const Color(0xFFFFD600), const Color(0xFFD32F2F));
+          _text(c, s, short, Colors.black, short.length > 5 ? 16 : 20);
+        case 'R':
+          _disc(c, s, const Color(0xFF1565C0), Colors.white, 6);
+          _text(c, s, short, Colors.white, short.length > 5 ? 16 : 20);
+        default:
+          _square(c, s, const Color(0xFF1565C0), Colors.white);
+          _text(c, s, short, Colors.white, short.length > 5 ? 16 : 20);
+      }
+    });
+  }
   switch (name) {
     case 'sign_speedCamera':
     case 'sign_streetCamera':

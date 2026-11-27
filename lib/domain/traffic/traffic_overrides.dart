@@ -1,4 +1,5 @@
 import '../../core/geo.dart';
+import 'sign_catalog.dart';
 import 'traffic_models.dart';
 
 /// Loai ban ghi sua tay (khop cot kind cua bang traffic_override).
@@ -49,7 +50,7 @@ class TrafficOverrideItem {
       case 'CAMERA':
         return _byName(cameraType) ?? SignKind.speedCamera;
       case 'SIGN':
-        return _byName(signCode);
+        return _byName(signCode) ?? (signCode != null && isCatalogCode(signCode!) ? SignKind.other : null);
     }
     return null;
   }
@@ -57,7 +58,7 @@ class TrafficOverrideItem {
   static SignKind? _byName(String? n) {
     if (n == null) return null;
     for (final SignKind k in SignKind.values) {
-      if (k.name == n) return k;
+      if (k.name == n && k != SignKind.other) return k;
     }
     return null;
   }
@@ -81,7 +82,10 @@ String? validateOverride({
     if (speedKmh == null || speedKmh < 5 || speedKmh > 130) return 'Tốc độ phải từ 5 đến 130 km/h.';
   } else if (kind == 'SIGN') {
     final SignKind? k = TrafficOverrideItem._byName(signCode);
-    if (k == null || k == SignKind.speedCamera || k == SignKind.streetCamera) return 'Chọn loại biển.';
+    if (k == null && signCode != null && isCatalogCode(signCode)) return null;
+    if (k == null || k == SignKind.speedCamera || k == SignKind.streetCamera || k == SignKind.other) {
+      return 'Chọn loại biển.';
+    }
     if (k == SignKind.maxSpeed && (speedKmh == null || speedKmh < 5 || speedKmh > 130)) {
       return 'Tốc độ phải từ 5 đến 130 km/h.';
     }
@@ -103,7 +107,7 @@ List<TrafficSign> applyOverrides(List<TrafficSign> base, List<TrafficOverrideIte
   for (final TrafficSign s in base) {
     bool hidden = false;
     for (final TrafficOverrideItem r in removals) {
-      if (r.signKind == s.kind && distanceMm(r.latE7!, r.lngE7!, s.latE7, s.lngE7) <= removeRadiusM * 1000) {
+      if (r.signKind == s.kind && (s.kind != SignKind.other || r.signCode == s.code) && distanceMm(r.latE7!, r.lngE7!, s.latE7, s.lngE7) <= removeRadiusM * 1000) {
         hidden = true;
         break;
       }
@@ -119,6 +123,7 @@ List<TrafficSign> applyOverrides(List<TrafficSign> base, List<TrafficOverrideIte
       kind: k,
       dirDeg: -1,
       speedKmh: k == SignKind.maxSpeed ? (o.speedKmh ?? -1) : -1,
+      code: k == SignKind.other ? o.signCode : null,
     ));
   }
   return out;

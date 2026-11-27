@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import '../../domain/traffic/sign_catalog.dart';
 import '../../domain/traffic/traffic_geojson.dart';
 import '../../domain/traffic/traffic_models.dart';
+import 'sign_picker.dart';
 
 /// Bao cao nhanh mot bien/camera tai vi tri hien tai (luu cuc bo, cho duyet).
 Future<bool> showReportSheet(
@@ -13,6 +15,7 @@ Future<bool> showReportSheet(
   required int lngE7,
 }) async {
   SignKind? kind = SignKind.maxSpeed;
+  CatalogSign? picked;
   bool missing = true; // true = bien thieu, false = bien sai/khong con
   final TextEditingController speed = TextEditingController();
   final TextEditingController note = TextEditingController();
@@ -45,16 +48,34 @@ Future<bool> showReportSheet(
                 spacing: 8,
                 runSpacing: 8,
                 children: <Widget>[
-                  for (final SignKind k in SignKind.values)
+                  for (final SignKind k in SignKind.values.where((SignKind v) => v != SignKind.other))
                     ChoiceChip(
                       key: Key('rk_${k.name}'),
                       label: Text(signLabel(k)),
-                      selected: kind == k,
-                      onSelected: (_) => set(() => kind = k),
+                      selected: kind == k && picked == null,
+                      onSelected: (_) => set(() {
+                        kind = k;
+                        picked = null;
+                      }),
                     ),
                 ],
               ),
-              if (kind == SignKind.maxSpeed)
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('pick_catalog'),
+                icon: const Icon(Icons.search),
+                label: Text(picked == null ? 'Chọn từ danh mục biển báo…' : '${picked!.code} ${picked!.name}'),
+                onPressed: () async {
+                  final CatalogSign? r = await showSignPicker(c);
+                  if (r == null) return;
+                  set(() {
+                    picked = r;
+                    // P.127 = bien toc do toi da: dung luong bao cao toc do.
+                    kind = r.code == 'P.127' ? SignKind.maxSpeed : null;
+                  });
+                },
+              ),
+              if (kind == SignKind.maxSpeed || picked?.code == 'P.127')
                 TextField(
                   key: const Key('report_speed'),
                   controller: speed,
@@ -85,10 +106,11 @@ Future<bool> showReportSheet(
       ),
     ),
   );
-  if (ok != true || kind == null) return false;
+  if (ok != true || (kind == null && picked == null)) return false;
   await ref.read(trafficReportRepositoryProvider).create(
-        kind: kind!.name,
+        kind: (picked != null && picked!.code != 'P.127') ? picked!.code : (kind ?? SignKind.maxSpeed).name,
         proposed: <String, dynamic>{
+          if (picked != null) 'name': picked!.name,
           'action': missing ? 'ADD' : 'REMOVE',
           if (kind == SignKind.maxSpeed && int.tryParse(speed.text.trim()) != null)
             'speedKmh': int.parse(speed.text.trim()),

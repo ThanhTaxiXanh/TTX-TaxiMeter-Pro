@@ -3,6 +3,7 @@ import 'traffic_models.dart';
 /// Ten anh bieu tuong tren ban do cho tung bien / POI.
 String signIconName(TrafficSign s) {
   if (s.kind == SignKind.maxSpeed && s.speedKmh > 0) return 'sign_speed_${s.speedKmh}';
+  if (s.kind == SignKind.other && s.code != null) return 'sign_code:${s.code}';
   return 'sign_${s.kind.name}';
 }
 
@@ -28,6 +29,8 @@ String signColor(SignKind k) {
       return '#ff8a65';
     case SignKind.p133:
       return '#81c784';
+    case SignKind.other:
+      return '#90caf9';
   }
 }
 
@@ -53,7 +56,16 @@ String signLabel(SignKind k) {
       return 'Cấm vượt';
     case SignKind.p133:
       return 'Hết cấm vượt';
+    case SignKind.other:
+      return 'Biển báo';
   }
+}
+
+/// Ten hien thi day du: bien khac -> kem ma (vd 'Biển P.103a').
+String signDisplayName(TrafficSign s) {
+  if (s.kind == SignKind.other && s.code != null) return 'Biển ${s.code}';
+  if (s.kind == SignKind.maxSpeed && s.speedKmh > 0) return '${signLabel(s.kind)} ${s.speedKmh}';
+  return signLabel(s.kind);
 }
 
 Map<String, dynamic> signsGeoJson(Iterable<NearbySign> signs) => <String, dynamic>{

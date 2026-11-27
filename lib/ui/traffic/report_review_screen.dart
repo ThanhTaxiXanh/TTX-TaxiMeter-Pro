@@ -34,9 +34,10 @@ class _ReportReviewScreenState extends ConsumerState<ReportReviewScreen> {
   String _title(TrafficReportItem r) {
     SignKind? k;
     for (final SignKind v in SignKind.values) {
-      if (v.name == r.kind) k = v;
+      if (v.name == r.kind && v != SignKind.other) k = v;
     }
-    final String name = k == null ? r.kind : signLabel(k);
+    final Object? pn = r.proposed['name'];
+    final String name = k == null ? '${r.kind}${pn is String && pn.isNotEmpty ? ' $pn' : ''}' : signLabel(k);
     final bool remove = r.proposed['action'] == 'REMOVE';
     final Object? sp = r.proposed['speedKmh'];
     return '${remove ? 'Không còn' : 'Thiếu'}: $name${sp != null ? ' $sp km/h' : ''}';

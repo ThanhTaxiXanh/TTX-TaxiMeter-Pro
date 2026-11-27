@@ -9,6 +9,7 @@ import '../data/map/map_source_service.dart';
 import '../domain/traffic/traffic_models.dart';
 import '../data/payment/payment_repository.dart';
 import '../data/traffic/traffic_repository.dart';
+import '../domain/traffic/sign_catalog.dart';
 import '../domain/traffic/traffic_overrides.dart';
 import '../data/traffic/traffic_report_repository.dart';
 import '../data/trip/tombstone_repository.dart';
@@ -78,3 +79,7 @@ final Provider<TrafficReportRepository> trafficReportRepositoryProvider =
 
 final Provider<TrafficRepository> trafficRepositoryProvider =
     Provider<TrafficRepository>((Ref ref) => TrafficRepository(ref.watch(databaseProvider)));
+
+final FutureProvider<List<CatalogSign>> signCatalogProvider = FutureProvider<List<CatalogSign>>((Ref ref) async {
+  return parseSignCatalog(await rootBundle.loadString('assets/data/sign_catalog.json'));
+});

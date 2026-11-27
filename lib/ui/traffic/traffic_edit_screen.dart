@@ -96,7 +96,7 @@ class _TrafficEditScreenState extends ConsumerState<TrafficEditScreen> {
   @override
   Widget build(BuildContext context) {
     final List<SignKind> signKinds = SignKind.values
-        .where((SignKind k) => k != SignKind.speedCamera && k != SignKind.streetCamera)
+        .where((SignKind k) => k != SignKind.speedCamera && k != SignKind.streetCamera && k != SignKind.other)
         .toList();
     return Scaffold(
       appBar: AppBar(title: Text(widget.item == null ? 'Thêm điểm giao thông' : 'Sửa điểm giao thông')),

@@ -1,6 +1,7 @@
 
 import 'package:drift/drift.dart' show QueryRow;
 
+import '../../domain/traffic/sign_catalog.dart';
 import '../../domain/traffic/traffic_models.dart';
 import '../../domain/traffic/traffic_overrides.dart';
 import '../db/app_database.dart';
@@ -91,7 +92,9 @@ class TrafficRepository {
   /// Bao cao + diem sua tay duoc ghi trong cung mot giao dich.
   Future<void> approveReport(TrafficReportItem r, {required int nowMs, String? reviewerNote}) async {
     if (r.status != 'PENDING') throw const TrafficRepositoryException('Báo cáo đã được xử lý.');
-    final SignKind? k = _kindByName(r.kind);
+    final SignKind? named = _kindByName(r.kind);
+    final bool catalog = named == null && isCatalogCode(r.kind);
+    final SignKind? k = named ?? (catalog ? SignKind.other : null);
     if (k == null) throw const TrafficRepositoryException('Loại biển không xác định.');
     if (r.latE7 == null || r.lngE7 == null) throw const TrafficRepositoryException('Báo cáo thiếu vị trí.');
     final bool add = (r.proposed['action'] as String?) != 'REMOVE';
@@ -103,7 +106,7 @@ class TrafficRepository {
       latE7: r.latE7,
       lngE7: r.lngE7,
       speedKmh: add ? speed : (k == SignKind.maxSpeed ? 5 : null),
-      signCode: ovKind == 'SIGN' ? k.name : null,
+      signCode: ovKind == 'SIGN' ? (catalog ? r.kind : k.name) : null,
       cameraType: cam ? k.name : null,
     );
     if (err != null) throw TrafficRepositoryException(err);
@@ -116,7 +119,7 @@ class TrafficRepository {
           r.latE7,
           r.lngE7,
           add ? speed : null,
-          ovKind == 'SIGN' ? k.name : null,
+          ovKind == 'SIGN' ? (catalog ? r.kind : k.name) : null,
           cam ? k.name : null,
           add ? sourceReport : sourceRemove,
           r.proposed['note'] as String?,
@@ -138,7 +141,7 @@ class TrafficRepository {
 
   static SignKind? _byNameStatic(String n) {
     for (final SignKind k in SignKind.values) {
-      if (k.name == n) return k;
+      if (k.name == n && k != SignKind.other) return k;
     }
     return null;
   }

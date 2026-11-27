@@ -4,12 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/providers.dart';
 import '../../domain/time/local_time.dart';
 import '../../domain/traffic/traffic_geojson.dart';
+import '../../domain/traffic/traffic_models.dart';
 import '../../domain/traffic/traffic_overrides.dart';
 import 'report_review_screen.dart';
 import 'traffic_edit_screen.dart';
 
 String overrideTitle(TrafficOverrideItem o) {
-  final String name = o.signKind == null ? o.kind : signLabel(o.signKind!);
+  final String name = o.signKind == SignKind.other ? 'Biển ${o.signCode}' : (o.signKind == null ? o.kind : signLabel(o.signKind!));
   final String sp = o.speedKmh != null ? ' ${o.speedKmh} km/h' : '';
   return o.isRemoval ? 'Ẩn: $name' : '$name$sp';
 }
