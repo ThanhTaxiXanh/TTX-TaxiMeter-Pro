@@ -10,6 +10,7 @@ import '../../app/providers.dart';
 import '../../core/geo.dart';
 import '../../data/map/map_source_service.dart';
 import '../../data/map/pmtiles_reader.dart';
+import '../../domain/traffic/speed_limit.dart';
 import '../../domain/traffic/traffic_geojson.dart';
 import '../../domain/traffic/traffic_models.dart';
 import '../common/format.dart';
@@ -31,6 +32,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   static const double _tilt = 60;
   static const double _followZoom = 18.2;
   static const double _maxZoom = 20.5;
+
+  /// Xe nam o ~75% chieu cao ban do (tinh tu tren xuong); khoang nhin xa duoc tu hieu chinh.
+  static const double _carFraction = 0.75;
+  double _lookAheadM = 75;
+  bool _calibrating = false;
+  final SpeedLimitTracker _limit = SpeedLimitTracker();
+  String? _roadKey;
+  int _lastLimitLat = 0, _lastLimitLng = 0;
+  bool _hasLimitPos = false;
 
   late final MapSourceService _service = ref.read(mapSourceServiceProvider);
   String? _baseUrl;
@@ -221,7 +231,30 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         setState(() => _following = false);
       }
     }
+    _calibrate();
     _refreshOverlays();
+  }
+
+  /// Do vi tri xe tren man hinh va chinh khoang nhin xa de xe nam ~75% chieu cao.
+  Future<void> _calibrate() async {
+    final MapLibreMapController? m = _map;
+    if (m == null || !_following || !_hasPos || _heading_ < 0 || _calibrating || !mounted) return;
+    _calibrating = true;
+    try {
+      final Size size = MediaQuery.of(context).size;
+      final double dpr = MediaQuery.of(context).devicePixelRatio;
+      final Point<num> sp = await m.toScreenLocation(LatLng(_lat / 10000000.0, _lng / 10000000.0));
+      final double y = sp.y.toDouble();
+      final double h = y > size.height ? size.height * dpr : size.height;
+      final double off = y / h - 0.5;
+      if (off > 0.04 && off < 0.6) {
+        final double ratio = (_carFraction - 0.5) / off;
+        _lookAheadM = (_lookAheadM * (1 + (ratio - 1) * 0.6)).clamp(10.0, 300.0);
+      }
+    } catch (_) {
+    } finally {
+      _calibrating = false;
+    }
   }
 
   bool _refreshing = false;
@@ -283,16 +316,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     _heading_ = h;
     final SignIndex? idx = ref.read(signIndexProvider).valueOrNull;
-    int limit = _limitKmh;
     List<NearbySign> all = _aheadAll;
     if (idx != null) {
-      final List<NearbySign> near = idx.nearby(lat, lng, 300);
       if (h >= 0) {
-        final NearbySign? lim = currentSpeedLimit(near, h);
-        if (lim != null) limit = lim.sign.speedKmh;
+        // Bien toc do chi co hieu luc sau khi xe da qua bien (hoac ngay tai bien), cung huong di.
+        for (final NearbySign n in idx.nearby(lat, lng, 80)) {
+          if (n.sign.kind != SignKind.maxSpeed || n.sign.speedKmh <= 0) continue;
+          if (n.sign.dirDeg >= 0 && angleDiffDeg(n.sign.dirDeg, h) > 60) continue;
+          final bool passed = n.distanceM <= 12 || angleDiffDeg(n.bearingDeg, h) > 100;
+          if (!passed) continue;
+          if (_limit.limitKmh != n.sign.speedKmh || !_limit.fromSign) _limit.onSignPassed(n.sign.speedKmh);
+          break;
+        }
       }
       all = aheadSigns(idx, lat, lng, h);
     }
+    await _updateLimitRoad(lat, lng);
+    final int limit = _limit.limitKmh;
     final List<Poi>? poi = ref.read(poiProvider).valueOrNull;
     NearestPoi? fuel = _fuel, ev = _ev;
     if (poi != null) {
@@ -314,8 +354,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       LatLng target = loc.position;
       if (h >= 0) {
         final double r = h * 3.141592653589793 / 180.0;
-        final double dLat = 35 * _cos(r) / 111320.0;
-        final double dLng = 35 * _sin(r) / (111320.0 * _cos(loc.position.latitude * 3.141592653589793 / 180.0));
+        final double dLat = _lookAheadM * _cos(r) / 111320.0;
+        final double dLng = _lookAheadM * _sin(r) / (111320.0 * _cos(loc.position.latitude * 3.141592653589793 / 180.0));
         target = LatLng(loc.position.latitude + dLat, loc.position.longitude + dLng);
       }
       _cmdLat = (target.latitude * 10000000).round();
@@ -340,6 +380,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       if (need) await _pushAhead(lat, lng, h);
     }
     await _updateStreet(loc.position, lat, lng);
+  }
+
+  /// Doc duong hien tai tu tile (offline): cap nhat gioi han toc do theo loai duong / khu dan cu.
+  Future<void> _updateLimitRoad(int lat, int lng) async {
+    if (_hasLimitPos && distanceMm(_lastLimitLat, _lastLimitLng, lat, lng) < 6000) return;
+    final int moved = _hasLimitPos ? distanceMm(_lastLimitLat, _lastLimitLng, lat, lng) ~/ 1000 : 0;
+    _lastLimitLat = lat;
+    _lastLimitLng = lng;
+    _hasLimitPos = true;
+    final RoadInfo? road = await _service.roadInfoAt(lat, lng, preferKey: _roadKey);
+    _limit.onRoad(road, movedM: moved);
+    _roadKey = _limit.road?.key;
   }
 
   /// Ve bien + POI phia truoc xe (<= 2 km) len ban do.

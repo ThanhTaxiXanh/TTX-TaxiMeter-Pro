@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../app/providers.dart';
 import '../../data/bank/bank_repository.dart';
@@ -8,6 +7,7 @@ import '../../payment/qr_content_generator.dart';
 import '../../payment/vietqr_payload_builder.dart';
 import '../common/format.dart';
 import 'bank_settings_screen.dart';
+import 'qr_with_logos.dart';
 
 /// Hop thoai thanh toan sau khi ket thuc chuyen: Tien mat hoac QR chuyen khoan.
 class PaymentDialog extends ConsumerStatefulWidget {
@@ -34,6 +34,7 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
   String? _qr;
   String? _content;
   DriverAccount? _acc;
+  List<DriverAccount> _accounts = <DriverAccount>[];
   String? _bankName;
   String? _error;
   bool _paid = false;
@@ -49,11 +50,12 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
     if (mounted) Navigator.pop(context);
   }
 
-  Future<void> _showQr() async {
+  Future<void> _showQr({DriverAccount? use}) async {
     final BankRepository banks = ref.read(bankRepositoryProvider);
     final int now = ref.read(clockProvider)();
     await banks.ensureSeeded(now);
-    final DriverAccount? acc = await banks.getDriverAccount();
+    _accounts = await banks.listAccounts();
+    final DriverAccount? acc = use ?? (_accounts.isEmpty ? null : _accounts.first);
     if (acc == null) {
       setState(() => _error = 'Chưa cài tài khoản nhận tiền. Bấm "Cài tài khoản" để nhập.');
       return;
@@ -134,20 +136,26 @@ class _PaymentDialogState extends ConsumerState<PaymentDialog> {
                 Text('Quãng đường: ${formatKm(widget.distanceM)}'),
                 Text('Chờ: ${formatDuration(widget.waitingSec)}'),
               ] else ...<Widget>[
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.all(8),
-                  child: QrImageView(
-                    key: const Key('qr'),
-                    data: _qr!,
-                    size: 240,
-                    backgroundColor: Colors.white,
-                    errorCorrectionLevel: QrErrorCorrectLevel.M,
-                  ),
-                ),
+                QrWithLogos(data: _qr!, size: 240, centerLogo: _acc!.centerLogo, bottomLogo: _acc!.bottomLogo),
                 const SizedBox(height: 8),
                 Text('$_bankName · ${_acc!.accountNumber}'),
                 Text(_acc!.holder),
+                if (_accounts.length > 1)
+                  PopupMenuButton<DriverAccount>(
+                    key: const Key('switch_account'),
+                    onSelected: (DriverAccount a) => _showQr(use: a),
+                    itemBuilder: (_) => <PopupMenuEntry<DriverAccount>>[
+                      for (final DriverAccount a in _accounts)
+                        PopupMenuItem<DriverAccount>(
+                          value: a,
+                          child: Text('${a.label.isEmpty ? a.bin : a.label} · ${a.accountNumber}'),
+                        ),
+                    ],
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Text('Đổi tài khoản nhận tiền', style: TextStyle(decoration: TextDecoration.underline)),
+                    ),
+                  ),
                 Text('Nội dung: $_content'),
               ],
               if (_error != null)

@@ -7,6 +7,22 @@
 //  - UPDATE/DELETE trip_adjustment, UPDATE trip_edit_log (chi them dong)
 //  - UPDATE cac cot so lieu cua trip_tombstone (chi cot doi soat duoc sua)
 
+/// Bang them tu schema v2 (SQL thuan): nhieu tai khoan nhan tien, moi tai khoan co logo QR rieng.
+/// Khong dung AUTOINCREMENT (tranh sqlite_sequence khi restore).
+const List<String> extraTableStatements = <String>[
+  'CREATE TABLE IF NOT EXISTS driver_account('
+      'id INTEGER PRIMARY KEY, label TEXT NOT NULL, bin TEXT NOT NULL, '
+      'account_number TEXT NOT NULL, account_holder TEXT NOT NULL, '
+      'is_default INTEGER NOT NULL DEFAULT 0, center_logo BLOB, bottom_logo BLOB, '
+      'created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)',
+];
+
+/// v1 -> v2: chuyen tai khoan duy nhat (driver_bank_account) thanh tai khoan mac dinh.
+const String migrateAccountV2 =
+    "INSERT INTO driver_account(label, bin, account_number, account_holder, is_default, created_at, updated_at) "
+    "SELECT 'Tài khoản chính', bin, account_number_encrypted, account_holder, 1, updated_at, updated_at "
+    "FROM driver_bank_account WHERE id = 1";
+
 const List<String> indexStatements = <String>[
   'CREATE INDEX idx_trip_started ON trip_record(started_at DESC)',
   'CREATE INDEX idx_trip_archived ON trip_record(archived, started_at DESC)',

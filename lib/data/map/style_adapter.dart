@@ -53,6 +53,17 @@ String? adaptStyleForOffline({
         <Object>['get', 'name'],
       ];
       layout['text-font'] = <String>[_fontFor(layout['text-font'])];
+      if (id.startsWith('highway-name')) {
+        // Ten duong chay doc theo duong, luon huong vao man hinh (khong bi dat bet xuong mat dat), de doc khi nghieng 3D.
+        layout['symbol-placement'] = 'line';
+        layout['text-pitch-alignment'] = 'viewport';
+        layout['text-rotation-alignment'] = 'map';
+        layout['text-keep-upright'] = true;
+        layout['text-max-angle'] = 60;
+        layout['symbol-spacing'] = 160;
+        layout['text-size'] = 14;
+        layout['text-padding'] = 4;
+      }
       m['layout'] = layout;
     }
     out.add(m);

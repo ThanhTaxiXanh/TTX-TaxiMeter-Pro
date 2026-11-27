@@ -150,3 +150,11 @@ Cổng chuyển Phase: Phase N phải pass 100% `flutter analyze` + `flutter tes
 - Vùng nguy hiểm: mọi thao tác gõ "XOA"; xóa tombstone có thẻ xác nhận riêng.
 - Test: test/settings/phase6_test.dart.
 - Việc còn lại → Phase 7: golden replay, hiệu năng/pin, APK release + khóa ký.
+
+## Phase 6b — Phản hồi sau khi dùng thử (video + ảnh, 2026-11-28)
+- **Bản đồ**: xe ở ~75% chiều cao (look-ahead tự hiệu chỉnh bằng `toScreenLocation` mỗi khi camera idle, hằng `_carFraction`); tên đường (`highway-name*`) chạy dọc đường, `text-pitch-alignment: viewport`, `text-keep-upright` — chưa kiểm chứng trên máy thật.
+- **Giới hạn tốc độ** (`lib/domain/traffic/speed_limit.dart`, `lib/data/map/road_info.dart`): biển chỉ có hiệu lực SAU khi xe đã qua biển (≤12 m hoặc bearing >100° so với hướng đi) và chỉ trên cùng tuyến (`RoadInfo.key` = loại + tên). Đổi tuyến 3 mẫu liên tiếp → bỏ biển, dùng mặc định theo loại đường + khu dân cư (taxi ≤ 8 chỗ, QCVN 41:2024 / TT 38/2024): trong KDC 50 (đường đôi 60), ngoài KDC 80 (đường đôi 90), cao tốc 100 (fallback), đường gom/service 40 (KDC)/60, ramp 50. Đường đôi chỉ nhận diện gần đúng (oneway cấp trunk/primary/secondary); KDC = ≥12 nhà trong ô ~340 m. ĐÂY LÀ ƯỚC TÍNH — chủ app cần đối chiếu thực tế.
+- **Báo cáo biển** (`report_sheet.dart`): lưới như ảnh mẫu, chỉ 2 tab Biển cấm + Hiệu lệnh, hàng tốc độ nhanh (40–120), chạm là lưu. Hình biển hiện là biểu tượng vẽ bằng code (`sign_glyph.dart`), CHƯA phải ảnh thật — cần bộ ảnh biển.
+- **Biểu giá nhiều + sửa bậc giá**: `TariffRepository.listConfigs/select/saveVersion`, màn `tariff_edit_screen.dart` (thêm/bớt bậc, giá mở cửa, chờ, làm tròn). Mỗi lần sửa = version mới; 1 biểu giá ACTIVE cho chuyến mới.
+- **Nhiều tài khoản nhận tiền**: schema v2 (`appSchemaVersion = 2`), bảng `driver_account` (nhãn, mặc định, logo giữa/dưới QR dạng PNG ≤256/400 px), migrate v1→v2 từ `driver_bank_account`. Tìm nhanh ngân hàng (tên/mã/BIN), đổi tài khoản ngay trên màn QR, QR dùng mức sửa lỗi H khi có logo giữa. LƯU Ý: backup v1 không restore được vào app v2 (schema khác).
+- Test: `test/settings/phase6b_test.dart`.

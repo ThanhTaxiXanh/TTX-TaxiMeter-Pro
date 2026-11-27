@@ -9,6 +9,7 @@ const List<String> expectedTables = <String>[
   'active_trip_snapshot',
   'bank_directory',
   'bank_directory_meta',
+  'driver_account',
   'driver_bank_account',
   'raw_gps_points',
   'raw_trace_meta',
@@ -86,7 +87,7 @@ void main() {
   setUp(() => db = memoryDb());
   tearDown(() => db.close());
 
-  test('schema: du 14 bang, 7 index, 6 trigger, user_version = schemaVersion', () async {
+  test('schema: du 15 bang, 7 index, 6 trigger, user_version = schemaVersion', () async {
     expect(await names(db, 'table'), expectedTables);
     expect(await names(db, 'index'), expectedIndexes);
     expect(await names(db, 'trigger'), expectedTriggers);

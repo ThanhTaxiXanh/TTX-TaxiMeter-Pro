@@ -227,3 +227,126 @@ Future<String?> streetNameFromReader(PmTilesReader r, int latE7, int lngE7) asyn
   }
   return nearestStreetName(lines, px, py);
 }
+
+/// Mot doi tuong MVT: kieu hinh hoc (1 diem, 2 duong, 3 vung), thuoc tinh va cac phan hinh hoc.
+class MvtFeature {
+  MvtFeature(this.type, this.props, this.parts);
+  final int type;
+  final Map<String, String> props;
+  final List<List<(int, int)>> parts;
+}
+
+/// Giai ma moi doi tuong cua lop [layerName] (thuoc tinh dang chuoi; so duoc doi sang chuoi).
+List<MvtFeature> decodeFeatures(Uint8List tile, String layerName) {
+  final List<MvtFeature> out = <MvtFeature>[];
+  final _Reader t = _Reader(tile);
+  while (!t.done) {
+    final int tag = t.varint();
+    if (tag >> 3 == 3 && tag & 7 == 2) {
+      _decodeFeatureLayer(t.bytes(), layerName, out);
+    } else {
+      t.skip(tag & 7);
+    }
+  }
+  return out;
+}
+
+void _decodeFeatureLayer(Uint8List data, String wanted, List<MvtFeature> out) {
+  final _Reader r = _Reader(data);
+  String name = '';
+  final List<String> keys = <String>[];
+  final List<String?> values = <String?>[];
+  final List<Uint8List> features = <Uint8List>[];
+  while (!r.done) {
+    final int tag = r.varint();
+    final int f = tag >> 3;
+    final int w = tag & 7;
+    if (f == 1 && w == 2) {
+      name = utf8.decode(r.bytes());
+    } else if (f == 2 && w == 2) {
+      features.add(r.bytes());
+    } else if (f == 3 && w == 2) {
+      keys.add(utf8.decode(r.bytes()));
+    } else if (f == 4 && w == 2) {
+      values.add(_anyValue(r.bytes()));
+    } else {
+      r.skip(w);
+    }
+  }
+  if (name != wanted) return;
+  for (final Uint8List fe in features) {
+    final _Reader fr = _Reader(fe);
+    List<int> tags = <int>[];
+    int type = 0;
+    Uint8List geom = Uint8List(0);
+    while (!fr.done) {
+      final int tag = fr.varint();
+      final int f = tag >> 3;
+      final int w = tag & 7;
+      if (f == 2 && w == 2) {
+        tags = _Reader(fr.bytes()).packedVarints();
+      } else if (f == 3 && w == 0) {
+        type = fr.varint();
+      } else if (f == 4 && w == 2) {
+        geom = fr.bytes();
+      } else {
+        fr.skip(w);
+      }
+    }
+    final Map<String, String> props = <String, String>{};
+    for (int i = 0; i + 1 < tags.length; i += 2) {
+      final int k = tags[i], v = tags[i + 1];
+      if (k < keys.length && v < values.length && values[v] != null) props[keys[k]] = values[v]!;
+    }
+    out.add(MvtFeature(type, props, _decodeParts(geom)));
+  }
+}
+
+/// Gia tri MVT -> chuoi: string(1), int(4), uint(5), sint(6), bool(7).
+String? _anyValue(Uint8List data) {
+  final _Reader r = _Reader(data);
+  while (!r.done) {
+    final int tag = r.varint();
+    final int f = tag >> 3;
+    final int w = tag & 7;
+    if (f == 1 && w == 2) return utf8.decode(r.bytes());
+    if ((f == 4 || f == 5) && w == 0) return r.varint().toString();
+    if (f == 6 && w == 0) {
+      final int z = r.varint();
+      return ((z >> 1) ^ -(z & 1)).toString();
+    }
+    if (f == 7 && w == 0) return r.varint() == 0 ? 'false' : 'true';
+    r.skip(w);
+  }
+  return null;
+}
+
+/// Cac phan hinh hoc (giu ca phan 1 diem).
+List<List<(int, int)>> _decodeParts(Uint8List geom) {
+  final List<int> g = _Reader(geom).packedVarints();
+  final List<List<(int, int)>> parts = <List<(int, int)>>[];
+  List<(int, int)> cur = <(int, int)>[];
+  int x = 0, y = 0, i = 0;
+  while (i < g.length) {
+    final int cmd = g[i] & 7;
+    final int count = g[i] >> 3;
+    i++;
+    if (cmd == 7) continue;
+    for (int c = 0; c < count && i + 1 < g.length; c++) {
+      x += (g[i] >> 1) ^ -(g[i] & 1);
+      y += (g[i + 1] >> 1) ^ -(g[i + 1] & 1);
+      i += 2;
+      if (cmd == 1) {
+        if (cur.isNotEmpty) parts.add(cur);
+        cur = <(int, int)>[(x, y)];
+      } else {
+        cur.add((x, y));
+      }
+    }
+  }
+  if (cur.isNotEmpty) parts.add(cur);
+  return parts;
+}
+
+/// Khoang cach (don vi tile) tu diem toi doan thang.
+double segmentDistance(int px, int py, (int, int) a, (int, int) b) => _segDist(px, py, a, b);

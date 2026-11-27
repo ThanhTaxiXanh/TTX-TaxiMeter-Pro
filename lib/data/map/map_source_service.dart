@@ -7,8 +7,10 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../domain/traffic/speed_limit.dart';
 import 'local_tile_server.dart';
 import 'pmtiles_reader.dart';
+import 'road_info.dart';
 import 'street_name.dart';
 
 /// Quan ly file ban do .pmtiles (chon tu dien thoai) va may chu tile cuc bo.
@@ -26,6 +28,17 @@ class MapSourceService {
     if (r == null) return null;
     try {
       return await streetNameFromReader(r, latE7, lngE7);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Thong tin duong (loai, ten, oneway, khu dan cu) doc offline tu tile; null neu khong co.
+  Future<RoadInfo?> roadInfoAt(int latE7, int lngE7, {String? preferKey}) async {
+    final PmTilesReader? r = _reader;
+    if (r == null) return null;
+    try {
+      return await roadInfoFromReader(r, latE7, lngE7, preferKey: preferKey);
     } catch (_) {
       return null;
     }

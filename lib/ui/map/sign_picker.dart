@@ -3,9 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
 import '../../domain/traffic/sign_catalog.dart';
-
-Color _bg(String g) => g == 'W' ? const Color(0xFFFFD600) : (g == 'P' ? Colors.white : const Color(0xFF1565C0));
-Color _fg(String g) => (g == 'W' || g == 'P') ? Colors.black : Colors.white;
+import 'sign_glyph.dart';
 
 /// Bang chon bien trong danh muc QCVN: tab theo nhom, tim theo ma hoac ten.
 Future<CatalogSign?> showSignPicker(BuildContext context) {
@@ -75,17 +73,7 @@ class _SignPickerState extends ConsumerState<_SignPicker> {
                         final CatalogSign s = shown[i];
                         return ListTile(
                           key: Key('sign_${s.code}'),
-                          leading: Container(
-                            width: 64,
-                            height: 40,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: _bg(s.group),
-                              borderRadius: BorderRadius.circular(s.group == 'W' || s.group == 'I' ? 6 : 20),
-                              border: Border.all(color: s.group == 'P' ? Colors.red : Colors.white24, width: 2),
-                            ),
-                            child: Text(s.code, style: TextStyle(color: _fg(s.group), fontSize: 12, fontWeight: FontWeight.w800)),
-                          ),
+                          leading: SignGlyph(code: s.code, group: s.group, size: 44),
                           title: Text(s.name.isEmpty ? 'Chưa có tên' : s.name),
                           onTap: () => Navigator.pop(context, s),
                         );
